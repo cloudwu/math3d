@@ -2,7 +2,7 @@ LUAINC=-I /usr/local/include
 LUALIB=-L /usr/local/bin -llua53
 GLM_INC = -I glm
 ODIR = o
-CFLAGS = -g -Wall
+CFLAGS = -O2 -Wall
 
 all : math3d.dll
 
