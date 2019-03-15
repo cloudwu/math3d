@@ -48,15 +48,68 @@ get_pointer(lua_State *L, struct lastack *LS, int index, int type) {
 	return v;
 }
 
+static void *
+getopt_pointer(lua_State *L, struct lastack *LS, int index, int type) {
+	if (lua_isnoneornil(L, index)) {
+		return NULL;
+	} else {
+		return get_pointer(L, LS, index, type);
+	}
+}
+
+static void *
+get_pointer_type(lua_State *L, struct lastack *LS, int index, int *type) {
+	float *v;
+	if (lua_isinteger(L, index)) {
+		int64_t id = lua_tointeger(L, index);
+		v = lastack_value(LS, id, type);
+	} else {
+		struct refobject * ref = (struct refobject *)luaL_checkudata(L, index, LINALG_REF);
+		if (ref->LS != NULL && ref->LS != LS) {
+			luaL_error(L, "Math stack mismatch");
+		}
+		v = lastack_value(LS, ref->id, type);
+	}
+	return v;
+}
+
+static void *
+get_pointer_variant(lua_State *L, struct lastack *LS, int index, int ismatrix) {
+	int type;
+	float *v;
+	if (lua_isinteger(L, index)) {
+		int64_t id = lua_tointeger(L, index);
+		v = lastack_value(LS, id, &type);
+	} else if (lua_istable(L, index)) {
+		return NULL;
+	} else {
+		struct refobject * ref = (struct refobject *)luaL_checkudata(L, index, LINALG_REF);
+		if (ref->LS != NULL && ref->LS != LS) {
+			luaL_error(L, "Math stack mismatch");
+		}
+		v = lastack_value(LS, ref->id, &type);
+	}
+	if (type == LINEAR_TYPE_MAT) {
+		if (!ismatrix)
+			typemismatch(L, LINEAR_TYPE_MAT, type);
+	} else {
+		if (ismatrix)
+			typemismatch(L, LINEAR_TYPE_VEC4, type);
+	}
+	return v;
+}
+
 // upvalue1  mathstack
 // upvalue2  cfunction
+// upvalue3  from
 // 2 mathid or mathuserdata LINALG_REF
 static int
 lmatrix_adapter_1(lua_State *L) {
 	struct boxstack *bp = lua_touserdata(L, lua_upvalueindex(1));
 	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
-	void * v = get_pointer(L, bp->LS, 2, LINEAR_TYPE_MAT);
-	lua_settop(L, 1);
+	int from = lua_tointeger(L, lua_upvalueindex(3));
+	void * v = get_pointer(L, bp->LS, from, LINEAR_TYPE_MAT);
+	lua_settop(L, from-1);
 	lua_pushlightuserdata(L, v);
 	return f(L);
 }
@@ -65,11 +118,20 @@ static int
 lmatrix_adapter_2(lua_State *L) {
 	struct boxstack *bp = lua_touserdata(L, lua_upvalueindex(1));
 	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
-	void * v1 = get_pointer(L, bp->LS, 2, LINEAR_TYPE_MAT);
-	void * v2 = get_pointer(L, bp->LS, 3, LINEAR_TYPE_MAT);
-	lua_settop(L, 1);
-	lua_pushlightuserdata(L, v1);
-	lua_pushlightuserdata(L, v2);
+	int from = lua_tointeger(L, lua_upvalueindex(3));
+	void * v1 = getopt_pointer(L, bp->LS, from, LINEAR_TYPE_MAT);
+	void * v2 = getopt_pointer(L, bp->LS, from+1, LINEAR_TYPE_MAT);
+	lua_settop(L, from-1);
+	if (v1) {
+		lua_pushlightuserdata(L, v1);
+	} else {
+		lua_pushnil(L);
+	}
+	if (v2) {
+		lua_pushlightuserdata(L, v2);
+	} else {
+		lua_pushnil(L);
+	}
 	return f(L);
 }
 
@@ -77,20 +139,24 @@ static int
 lmatrix_adapter_var(lua_State *L) {
 	struct boxstack *bp = lua_touserdata(L, lua_upvalueindex(1));
 	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
+	int from = lua_tointeger(L, lua_upvalueindex(3));
 	int i;
 	int top = lua_gettop(L);
-	for (i=2;i<=top;i++) {
-		void * v = get_pointer(L, bp->LS, i, LINEAR_TYPE_MAT);
-		lua_pushlightuserdata(L, v);
-		lua_replace(L, i);
+	struct lastack *LS = bp->LS;
+	for (i=from;i<=top;i++) {
+		void * v = getopt_pointer(L, LS, i, LINEAR_TYPE_MAT);
+		if (v) {
+			lua_pushlightuserdata(L, v);
+			lua_replace(L, i);
+		}
 	}
 	return f(L);
 }
 
 // userdata mathstack
 // cfunction original function
-// integer n
 // integer from 
+// integer n
 static int
 lbind_matrix(lua_State *L) {
 	luaL_checkudata(L, 1, LINALG);
@@ -98,11 +164,8 @@ lbind_matrix(lua_State *L) {
 		return luaL_error(L, "need a c function");
 	if (lua_getupvalue(L, 2, 1) != NULL)
 		luaL_error(L, "Only support light cfunction");
-	int n = luaL_optinteger(L, 3, 0);
-	int from = luaL_optinteger(L, 4, 2);
-	if (from != 2) {
-		luaL_error(L, "Only support adapter index 2 + now");
-	}
+	int from = luaL_checkinteger(L, 3);
+	int n = luaL_optinteger(L, 4, 0);
 	lua_CFunction f;
 	switch (n) {
 	case 0:
@@ -118,7 +181,64 @@ lbind_matrix(lua_State *L) {
 		return luaL_error(L, "Only support 1,2,0(vararg) now");
 	}
 	lua_settop(L, 2);
-	lua_pushcclosure(L, f, 2);
+	lua_pushinteger(L, from);
+	lua_pushcclosure(L, f, 3);
+	return 1;
+}
+
+// upvalue1 mathstack
+// upvalue2 matrix cfunction
+// upvalue3 vector cfunction
+// upvalue4 integer from
+static int
+lvariant(lua_State *L) {
+	struct boxstack *bp = lua_touserdata(L, lua_upvalueindex(1));
+	struct lastack *LS = bp->LS;
+	int from = lua_tointeger(L, lua_upvalueindex(4));
+	int ismatrix;
+	if (lua_type(L, from) == LUA_TTABLE) {
+		ismatrix = lua_rawlen(L, from) >= 12;
+	} else {
+		int type;
+		void *v = get_pointer_type(L, LS, from, &type);
+		ismatrix = (type == LINEAR_TYPE_MAT);
+		lua_pushlightuserdata(L, v);
+		lua_replace(L, from);
+	}
+	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(ismatrix ? 2 : 3));
+
+	int i;
+	int top = lua_gettop(L);
+
+	for (i=from+1;i<=top;i++) {
+		void * v = get_pointer_variant(L, LS, i, ismatrix);
+		if (v) {
+			lua_pushlightuserdata(L, v);
+			lua_replace(L, i);
+		}
+	}
+
+	return f(L);
+}
+
+// userdata mathstack
+// cfunction original function for matrix
+// cfunction original function for vector
+// integer from
+static int
+lbind_variant(lua_State *L) {
+	luaL_checkudata(L, 1, LINALG);
+	if (!lua_iscfunction(L, 2))
+		return luaL_error(L, "need a c function");
+	if (lua_getupvalue(L, 2, 1) != NULL)
+		luaL_error(L, "Only support light cfunction");
+	if (!lua_iscfunction(L, 3))
+		return luaL_error(L, "need a c function");
+	if (lua_getupvalue(L, 3, 1) != NULL)
+		luaL_error(L, "Only support light cfunction");
+	luaL_checkinteger(L, 4);
+	lua_settop(L, 4);
+	lua_pushcclosure(L, lvariant, 4);
 	return 1;
 }
 
@@ -127,6 +247,7 @@ luaopen_math3d_adapter(lua_State *L) {
 	luaL_checkversion(L);
 	luaL_Reg l[] = {
 		{ "matrix", lbind_matrix },
+		{ "variant", lbind_variant },
 		{ NULL, NULL },
 	};
 
