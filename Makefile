@@ -3,8 +3,9 @@ LUALIB=-L /usr/local/bin -llua53
 GLM_INC = -I glm
 ODIR = o
 CFLAGS = -O2 -Wall
+OUTPUT=./
 
-all : math3d.dll
+all : $(OUTPUT)math3d.dll
 
 $(ODIR)/linalg.o : linalg.c | $(ODIR)
 	$(CC) -c $(CFLAGS) -o $@ $^ $(LUAINC) $(GLM_INC)
@@ -18,7 +19,7 @@ $(ODIR)/mathbaselib.o : mathbaselib.cpp | $(ODIR)
 $(ODIR)/mathadapter.o : mathadapter.c | $(ODIR)
 	$(CC) -c $(CFLAGS) -o $@ $^ $(LUAINC)
 
-math3d.dll : $(ODIR)/linalg.o $(ODIR)/math3d.o $(ODIR)/mathbaselib.o $(ODIR)/mathadapter.o
+$(OUTPUT)math3d.dll : $(ODIR)/linalg.o $(ODIR)/math3d.o $(ODIR)/mathbaselib.o $(ODIR)/mathadapter.o
 	$(CXX) --shared $(CFLAGS) -o $@ $^ -lstdc++ $(LUALIB)
 
 $(ODIR) :
