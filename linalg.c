@@ -20,15 +20,8 @@ static float c_ident_mat[16] = {
 	0,0,0,1,
 };
 
-static float c_ident_num[4] = {
-	0, 0, 0, 0
-};
-
 static float c_ident_quat[4] = {
 	0, 0, 0, 1,
-};
-static float c_ident_euler[4] = {
-	0, 0, 0, 0,
 };
 
 struct constant {
@@ -36,12 +29,10 @@ struct constant {
 	int size;
 };
 
-static struct constant c_constant_table[LINEAR_CONSTANT_COUNT] = {
+static struct constant c_constant_table[LINEAR_TYPE_COUNT] = {
 	{ c_ident_mat, MATRIX },
 	{ c_ident_vec, VECTOR4 },	
-	{ c_ident_num, VECTOR4 },
 	{ c_ident_quat, VECTOR4 },
-	{ c_ident_euler, VECTOR4 },
 };
 
 struct stackid_ {
@@ -58,14 +49,12 @@ union stackid {
 
 int64_t
 lastack_constant(int cons) {
-	if (cons < 0 || cons >= LINEAR_CONSTANT_COUNT)
+	if (cons < 0 || cons >= LINEAR_TYPE_COUNT)
 		return 0;
 	union stackid sid;	
 	sid.s.version = 0;
 	sid.s.id = cons;
 	sid.s.persistent = 1;
-
-	assert((int)LINEAR_TYPE_COUNT == (int)LINEAR_CONSTANT_COUNT);
 	sid.s.type = cons;
 	
 	return sid.i;
@@ -85,6 +74,7 @@ struct lastack {
 	struct blob * per_mat;
 	struct oldpage *old;
 	union stackid *stack;
+	size_t oldpage_size;
 };
 
 #define TAG_FREE 0
@@ -109,6 +99,7 @@ struct blob {
 	char * buffer;
 	struct slot *s;
 	struct oldpage *old;
+	size_t oldpage_size;
 };
 
 static inline void
@@ -133,7 +124,13 @@ blob_new(int size, int cap) {
 	B->s = malloc(cap * sizeof(*B->s));
 	init_blob_slots(B, 0, cap);
 	B->old = NULL;
+	B->oldpage_size = 0;
 	return B;
+}
+
+static size_t
+blob_size(struct blob *B) {
+	return sizeof(*B) + (B->size + sizeof(*B->s)) * B->cap + B->oldpage_size;
 }
 
 static void
@@ -158,6 +155,8 @@ blob_alloc(struct blob *B, int version) {
 		B->old = p;
 
 		int cap = B->cap;	
+		B->oldpage_size += sizeof(*p) + B->size * cap;
+
 		B->cap *= 2;
 		B->buffer = malloc(B->size * B->cap);
 		memcpy(B->buffer, p->page, B->size * cap);
@@ -165,9 +164,7 @@ blob_alloc(struct blob *B, int version) {
 		static int alloc_count = 0;
 		alloc_count ++;
 		init_blob_slots(B, cap, B->cap);
-//		printf("...... alloc new blob %d,s = %d,c = %d, freeslot = %d .......\n",alloc_count,B->size,B->cap,B->freeslot);
 	}
-	//printf("freeslot = %d \n",B->freeslot);
 	int ret = SLOT_INDEX(B->freeslot);
 	struct slot *s = &B->s[ret];
 	B->freeslot = s->id;	// next free slot
@@ -210,6 +207,7 @@ blob_flush(struct blob *B) {
 	}
 	free_oldpage(B->old);
 	B->old = NULL;
+	B->oldpage_size = 0;
 }
 
 static void
@@ -287,7 +285,18 @@ lastack_new() {
 	LS->per_mat = blob_new(MATRIX * sizeof(float), MINCAP);
 	LS->old = NULL;
 	LS->stack = malloc(LS->stack_cap * sizeof(*LS->stack));
+	LS->oldpage_size = 0;
 	return LS;
+}
+
+size_t
+lastack_size(struct lastack *LS) {
+	return sizeof(*LS)
+		+ LS->temp_vector_cap * VECTOR4 * sizeof(float)
+		+ LS->temp_matrix_cap * MATRIX * sizeof(float)
+		+ LS->stack_cap * sizeof(*LS->stack)
+		+ blob_size(LS->per_vec)
+		+ blob_size(LS->per_mat);
 }
 
 void
@@ -312,30 +321,121 @@ push_id(struct lastack *LS, union stackid id) {
 }
 
 static void *
-new_page(struct lastack *LS, void *page) {
+new_page(struct lastack *LS, void *page, size_t page_size) {
 	struct oldpage * p = malloc(sizeof(*p));
 	p->next = LS->old;
 	p->page = page;
 	LS->old = p;
+	LS->oldpage_size += page_size + sizeof(*p);
 	return page;
 }
 
-static inline int
-get_type_size(int type) {
-	const int sizes[LINEAR_TYPE_COUNT] = { 16, 4, 1, 4, 3 };
-	assert(LINEAR_TYPE_MAT <= type && type < LINEAR_TYPE_COUNT);
+int
+lastack_typesize(int type) {
+	const int sizes[LINEAR_TYPE_COUNT] = { 16, 4, 4 };
+//	assert(LINEAR_TYPE_MAT <= type && type < LINEAR_TYPE_COUNT);
 	return sizes[type];
+}
+
+const char *
+lastack_typename(int t) {
+	static const char * type_names[] = {
+		"mat",
+		"v4",
+		"quat",
+	};
+	if (t < 0 || t >= sizeof(type_names)/sizeof(type_names[0]))
+		return "unknown";
+	return type_names[t];
+}
+
+
+static float *
+check_matrix_pool(struct lastack *LS) {
+	if (LS->temp_matrix_top >= LS->temp_matrix_cap) {
+		size_t sz = LS->temp_matrix_cap * sizeof(float) * MATRIX;
+		void * p = new_page(LS, LS->temp_mat, sz);
+		LS->temp_mat = malloc(sz * 2);
+		memcpy(LS->temp_mat, p, sz);
+		LS->temp_matrix_cap *= 2;
+	}
+	return LS->temp_mat + LS->temp_matrix_top * MATRIX;
 }
 
 void
 lastack_pushmatrix(struct lastack *LS, const float *mat) {
-	if (LS->temp_matrix_top >= LS->temp_matrix_cap) {
-		void * p = new_page(LS, LS->temp_mat);
-		LS->temp_mat = malloc(LS->temp_matrix_cap * 2 * sizeof(float) * MATRIX);
-		memcpy(LS->temp_mat, p, LS->temp_matrix_cap * sizeof(float) * MATRIX);
-		LS->temp_matrix_cap *= 2;
+	float * pmat = check_matrix_pool(LS);
+	memcpy(pmat, mat, sizeof(float) * MATRIX);
+	union stackid sid;
+	sid.s.type = LINEAR_TYPE_MAT;
+	sid.s.persistent = 0;
+	sid.s.version = LS->version;
+	sid.s.id = LS->temp_matrix_top;
+	push_id(LS, sid);
+	++ LS->temp_matrix_top;
+}
+
+void
+lastack_pushsrt(struct lastack *LS, const float *s, const float *r, const float *t) {
+#define NOTIDENTITY (~0)
+	float * mat = check_matrix_pool(LS);
+	uint32_t * mark = (uint32_t *)&mat[3*4];
+	// scale
+	float *scale = &mat[0];
+	if (s == NULL) {
+		scale[0] = 1;
+		scale[1] = 1;
+		scale[2] = 1;
+		scale[3] = 0;
+		mark[0] = 0;
+	} else {
+		float sx = s[0];
+		float sy = s[1];
+		float sz = s[2];
+		scale[0] = sx;
+		scale[1] = sy;
+		scale[2] = sz;
+		scale[3] = 0;
+		if (sx == 1 && sy == 1 && sz == 1) {
+			mark[0] = NOTIDENTITY;
+		}
 	}
-	memcpy(LS->temp_mat + LS->temp_matrix_top * MATRIX, mat, sizeof(float) * MATRIX);
+	// rotation
+	float *rotation = &mat[4*1];
+	if (r == NULL || (r[0] == 0 && r[1] == 0 && r[2] == 0 && r[3] == 1)) {
+		rotation[0] = 0;
+		rotation[1] = 0;
+		rotation[2] = 0;
+		rotation[3] = 1;
+		mark[1] = 0;
+	} else {
+		rotation[0] = r[0];
+		rotation[1] = r[1];
+		rotation[2] = r[2];
+		rotation[3] = r[3];
+		mark[1] = NOTIDENTITY;
+	}
+	// translate
+	float *translate = &mat[4*2];
+	if (t == NULL || (t[0] == 0 && t[1] == 0 && t[2] == 0)) {
+		translate[0] = 0;
+		translate[1] = 0;
+		translate[2] = 0;
+		translate[3] = 1;
+		mark[2] = 0;
+	} else {
+		translate[0] = t[0];
+		translate[1] = t[1];
+		translate[2] = t[2];
+		translate[3] = 1;
+		mark[2] = NOTIDENTITY;
+	}
+	// mark identity
+	if (mark[0] == 0 && mark[1] == 0 && mark[2] == 0) {
+		mark[3] = 0;
+	} else {
+		mark[3] = NOTIDENTITY;
+	}
 	union stackid sid;
 	sid.s.type = LINEAR_TYPE_MAT;
 	sid.s.persistent = 0;
@@ -351,11 +451,13 @@ lastack_pushobject(struct lastack *LS, const float *v, int type) {
 		lastack_pushmatrix(LS, v);
 		return;
 	}
-	const int size = get_type_size(type);
+	assert(type >= LINEAR_TYPE_VEC4 && type <= LINEAR_TYPE_QUAT);
+	const int size = lastack_typesize(type);
 	if (LS->temp_vector_top >= LS->temp_vector_cap) {
-		void * p = new_page(LS, LS->temp_vec);
-		LS->temp_vec = malloc(LS->temp_vector_cap * 2 * sizeof(float) * VECTOR4);
-		memcpy(LS->temp_vec, p, LS->temp_vector_cap * sizeof(float) * VECTOR4);
+		size_t sz = LS->temp_vector_cap * sizeof(float) * VECTOR4;
+		void * p = new_page(LS, LS->temp_vec, sz);
+		LS->temp_vec = malloc(sz * 2);
+		memcpy(LS->temp_vec, p, sz);
 		LS->temp_vector_cap *= 2;
 	}
 	memcpy(LS->temp_vec + LS->temp_vector_top * VECTOR4, v, sizeof(float) * size);
@@ -378,16 +480,6 @@ lastack_pushquat(struct lastack *LS, const float *v) {
 	lastack_pushobject(LS, v, LINEAR_TYPE_QUAT);
 }
 
-void
-lastack_pusheuler(struct lastack *LS, const float *v) {
-	lastack_pushobject(LS, v, LINEAR_TYPE_EULER);
-}
-
-void
-lastack_pushnumber(struct lastack *LS, float n) {
-	lastack_pushobject(LS, &n, LINEAR_TYPE_NUM);
-}
-
 const float *
 lastack_value(struct lastack *LS, int64_t ref, int *type) {
 	union stackid sid;
@@ -401,12 +493,12 @@ lastack_value(struct lastack *LS, int64_t ref, int *type) {
 		if (sid.s.version == 0) {
 			// constant
 			int id = sid.s.id;
-			if (id < 0 || id >= LINEAR_CONSTANT_COUNT)
+			if (id < 0 || id >= LINEAR_TYPE_COUNT)
 				return NULL;
 			struct constant * c = &c_constant_table[id];
 			return c->ptr;
 		}
-		if (sid.s.type == LINEAR_TYPE_MAT) {
+		if (lastack_typesize(sid.s.type) == MATRIX) {
 			address = blob_address( LS->per_mat , id, ver);
 		} else {
 			address = blob_address( LS->per_vec , id, ver);
@@ -417,7 +509,7 @@ lastack_value(struct lastack *LS, int64_t ref, int *type) {
 			// version expired
 			return NULL;
 		}
-		if (sid.s.type == LINEAR_TYPE_MAT) {
+		if (lastack_typesize(sid.s.type) == MATRIX) {
 			if (id >= LS->temp_matrix_top) {
 				return NULL;
 			}
@@ -443,36 +535,30 @@ lastack_pushref(struct lastack *LS, int64_t ref) {
 	return 0;
 }
 
-int64_t
+void
 lastack_unmark(struct lastack *LS, int64_t markid) {
 	union stackid id;
 	id.i = markid;
 	if (id.s.persistent && id.s.version != 0) {
-		if (id.s.type != LINEAR_TYPE_MAT) {
+		if (lastack_typesize(id.s.type) != MATRIX) {
 			blob_dealloc(LS->per_vec, id.s.id, id.s.version);
 		} else {
 			blob_dealloc(LS->per_mat, id.s.id, id.s.version);
 		}
 	}
-	switch (id.s.type) {
-	case LINEAR_TYPE_VEC4:
-		return lastack_constant(LINEAR_CONSTANT_IVEC);
-	case LINEAR_TYPE_MAT:
-		return lastack_constant(LINEAR_CONSTANT_IMAT);
-	case LINEAR_CONSTANT_NUM:
-		return lastack_constant(LINEAR_CONSTANT_NUM);
-	case LINEAR_CONSTANT_QUAT:
-		return lastack_constant(LINEAR_CONSTANT_QUAT);
-	case LINEAR_TYPE_EULER:
-		return lastack_constant(LINEAR_CONSTANT_EULER);
-	default:
-		assert(0 && "not support type");
-		return lastack_constant(LINEAR_CONSTANT_IVEC);
-	}
+}
+
+int
+lastack_isconstant(int64_t markid) {
+	union stackid id;
+	id.i = markid;
+	return (id.s.persistent && id.s.version == 0);
 }
 
 int64_t
 lastack_mark(struct lastack *LS, int64_t tempid) {
+	if (lastack_isconstant(tempid))
+		return tempid;
 	int t;
 	const float *address = lastack_value(LS, tempid, &t);
 	if (address == NULL) {
@@ -483,7 +569,7 @@ lastack_mark(struct lastack *LS, int64_t tempid) {
 	union stackid sid;
 	sid.s.version = LS->version;
 	sid.s.type = t;
-	if (t != LINEAR_TYPE_MAT) {
+	if (lastack_typesize(t) != MATRIX) {
 		id = blob_alloc(LS->per_vec, LS->version);
 		void * dest = blob_address(LS->per_vec, id, LS->version);
 		memcpy(dest, address, sizeof(float) * VECTOR4);
@@ -565,6 +651,7 @@ lastack_reset(struct lastack *LS) {
 	LS->stack_top = 0;
 	free_oldpage(LS->old);
 	LS->old = NULL;
+	LS->oldpage_size = 0;
 	blob_flush(LS->per_vec);
 	blob_flush(LS->per_mat);
 	LS->temp_vector_top = 0;
@@ -597,14 +684,6 @@ print_object(const float *address, int id, int type) {
 	case LINEAR_TYPE_QUAT:
 		printf("(Q%d: ",id);
 		print_float(address, 4);
-		break;
-	case LINEAR_TYPE_NUM:
-		printf("(N%d: ",id);
-		print_float(address, 1);
-		break;
-	case LINEAR_TYPE_EULER:
-		printf("(E%d: ",id);
-		print_float(address, 3);
 		break;
 	default:
 		printf("(Invalid");
@@ -661,6 +740,13 @@ lastack_dump(struct lastack *LS, int from) {
 	}
 }
 
+int 
+lastack_type(struct lastack *LS, int64_t id) {
+	union stackid sid;
+	sid.i = id;
+	return sid.s.type;
+}
+
 char *
 lastack_idstring(int64_t id, char tmp[64]) {
 	union stackid sid;
@@ -675,12 +761,6 @@ lastack_idstring(int64_t id, char tmp[64]) {
 		break;	
 	case LINEAR_TYPE_QUAT:
 		flags[0] = 'Q';
-		break;
-	case LINEAR_TYPE_NUM:
-		flags[0] = 'N';
-		break;
-	case LINEAR_TYPE_EULER:
-		flags[0] = 'E';
 		break;
 	default:
 		flags[0] = '?';

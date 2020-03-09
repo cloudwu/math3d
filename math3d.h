@@ -1,16 +1,18 @@
 #ifndef math3d_lua_binding_h
 #define math3d_lua_binding_h
 
-#define LINALG "LINALG"
-#define LINALG_REF "LINALG_REF"
-
 struct boxstack {
 	struct lastack *LS;	
 };
 
 struct refobject {
-	struct lastack *LS;
 	int64_t id;
 };
+
+#define MATH3D_STACK "_MATHSTACK"
+
+// binding functions
+
+const float * math3d_from_lua(lua_State *L, struct lastack *LS, int index, int type);
 
 #endif
