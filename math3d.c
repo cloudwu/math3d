@@ -899,6 +899,51 @@ ltorotation(lua_State *L) {
 	return 1;
 }
 
+static int
+ltotable(lua_State *L){
+	struct lastack *LS = GETLS(L);
+	int64_t id = get_id(L, 1, lua_type(L, 1));
+	to_table(L, LS, id);
+	return 1;
+}
+
+static int
+lbase_axes(lua_State *L) {
+	struct lastack *LS = GETLS(L);
+
+	const float *forward = vector_from_index(L, LS, 1);
+
+	math3d_base_axes(LS, forward);
+
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));	// right
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));	// up
+	return 2;
+}
+
+static int
+lrotate_vector(lua_State *L){
+	struct lastack *LS = GETLS(L);
+	const int64_t rotatorid = get_id(L, 1, lua_type(L, 1));
+	const float* v = vector_from_index(L, LS, 2);
+
+	int type;
+	const float *rotator = (const float *)lastack_value(LS, rotatorid, &type);
+
+	switch (type){
+	case LINEAR_TYPE_QUAT:
+		math3d_quat_rotate_vec(LS, rotator, v);
+		break;
+	case LINEAR_TYPE_MAT:
+		math3d_rotmat_rotate_vec(LS, rotator, v);
+		break;
+	default: 
+		return luaL_error(L, "only support quat/mat for rotate vector:%s", lastack_typename(type));
+	}
+
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
+	return 1;
+}
+
 static void
 create_proj_mat(lua_State *L, struct lastack *LS, int index) {
 	float left, right, top, bottom;
@@ -1073,6 +1118,9 @@ luaopen_math3d(lua_State *L) {
 		{ "reciprocal", lreciprocal },
 		{ "todirection", ltodirection },
 		{ "torotation", ltorotation },
+		{ "totable", ltotable},
+		{ "base_axes", lbase_axes},
+		{ "rotate_vector", lrotate_vector},
 		{ "view_proj", lview_proj},
 		{ "homogeneous_depth", lhomogeneous_depth },
 		{ NULL, NULL },

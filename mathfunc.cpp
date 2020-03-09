@@ -8,6 +8,8 @@ extern "C" {
 	#include "math3dfunc.h"
 }
 
+#include "util.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -15,6 +17,15 @@ extern "C" {
 #include <glm/ext/scalar_relational.hpp>
 #include <glm/ext/vector_relational.hpp>
 #include <glm/gtx/euler_angles.hpp>
+
+static const glm::vec4 XAXIS(1, 0, 0, 0);
+static const glm::vec4 YAXIS(0, 1, 0, 0);
+static const glm::vec4 ZAXIS(0, 0, 1, 0);
+static const glm::vec4 WAXIS(0, 0, 0, 1);
+
+static const glm::vec4 NXAXIS = -XAXIS;
+static const glm::vec4 NYAXIS = -YAXIS;
+static const glm::vec4 NZAXIS = -ZAXIS;
 
 void
 math3d_make_srt(struct lastack *LS, const float *scale, const float *rot, const float *translate) {
@@ -60,10 +71,10 @@ math3d_make_quat_from_axis(struct lastack *LS, const float *axis, float radian) 
 }
 
 #define BINTYPE(v1, v2) (((v1) << LINEAR_TYPE_BITS_NUM) + (v2))
-#define MAT(v) (*(const glm::mat4x4 *)v)
-#define VEC(v) (*(const glm::vec4 *)v)
-#define VEC3(v) (*(const glm::vec3 *)v)
-#define QUAT(v) (*(const glm::quat *)v)
+#define MAT(v) (*(const glm::mat4x4 *)(v))
+#define VEC(v) (*(const glm::vec4 *)(v))
+#define VEC3(v) (*(const glm::vec3 *)(v))
+#define QUAT(v) (*(const glm::quat *)(v))
 
 int
 math3d_mul_object(struct lastack *LS, const float *val0, const float *val1, int ltype, int rtype, float tmp[16]) {
@@ -93,12 +104,6 @@ math3d_mul_object(struct lastack *LS, const float *val0, const float *val1, int 
 		quat = QUAT(val0) * QUAT(val1);
 		return LINEAR_TYPE_QUAT;
 	}
-	case BINTYPE(LINEAR_TYPE_QUAT, LINEAR_TYPE_VEC4):
-		vec = glm::rotate(QUAT(val0), VEC(val1));
-		return LINEAR_TYPE_VEC4;
-	case BINTYPE(LINEAR_TYPE_VEC4, LINEAR_TYPE_QUAT):
-		vec = glm::rotate(QUAT(val1), VEC(val0));
-		return LINEAR_TYPE_VEC4;
 	case BINTYPE(LINEAR_TYPE_VEC4, LINEAR_TYPE_VEC4):
 		vec = VEC(val0) * VEC(val1);
 		return LINEAR_TYPE_VEC4;
@@ -296,3 +301,38 @@ math3d_orthoLH(struct lastack *LS, float left, float right, float bottom, float 
 	lastack_pushmatrix(LS, &mat[0][0]);
 }
 
+void
+math3d_base_axes(struct lastack *LS, const float forward[4]) {
+	glm::vec4 right, up;
+
+	if (is_equal(VEC(forward), ZAXIS)) {
+		up = YAXIS;
+		right = XAXIS;
+	} else {
+		if (is_equal(VEC(forward), YAXIS)) {
+			up = NZAXIS;
+			right = XAXIS;
+		} else if (is_equal(VEC(forward), NYAXIS)) {
+			up = ZAXIS;
+			right = XAXIS;
+		} else {
+			right = glm::vec4(glm::normalize(glm::cross(VEC3(&YAXIS.x), VEC3(forward))), 0);
+			up = glm::vec4(glm::normalize(glm::cross(VEC3(forward), VEC3(&right.x))), 0);
+		}
+	}
+
+	lastack_pushvec4(LS, &up.x);
+	lastack_pushvec4(LS, &right.x);
+}
+
+void
+math3d_quat_rotate_vec(struct lastack *LS, const float quat[4], const float v[4]){
+	const glm::vec4 vv = glm::rotate(QUAT(quat), VEC(v));
+	lastack_pushvec4(LS, &vv.x);
+}
+
+void
+math3d_rotmat_rotate_vec(struct lastack *LS, const float mat[16], const float v[4]){
+	const glm::vec4 vv = MAT(mat) * VEC(v);
+	lastack_pushvec4(LS, &vv.x);
+}
