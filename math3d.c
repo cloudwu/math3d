@@ -98,6 +98,7 @@ static int64_t
 assign_id(lua_State *L, struct lastack *LS, int index, int mtype, int ltype) {
 	switch (ltype) {
 	case LUA_TNIL:
+	case LUA_TNONE:
 		// identity matrix
 		return lastack_constant(mtype);
 	case LUA_TUSERDATA:
@@ -147,6 +148,7 @@ object_from_index(lua_State *L, struct lastack *LS, int index, int mtype, from_t
 	const float * result = NULL;
 	switch(ltype) {
 	case LUA_TNIL:
+	case LUA_TNONE:
 		break;
 	case LUA_TUSERDATA:
 	case LUA_TLIGHTUSERDATA: {
@@ -838,11 +840,11 @@ linverse(lua_State *L) {
 static int
 llookat(lua_State *L) {
 	struct lastack *LS = GETLS(L);
-	const float * at = vector_from_index(L, LS, 1);
-	const float * eye = vector_from_index(L, LS, 2);
+	const float * eye = vector_from_index(L, LS, 1);
+	const float * at = vector_from_index(L, LS, 2);
 	const float * up = object_from_index(L, LS, 3, LINEAR_TYPE_VEC4, vector_from_table);
 
-	math3d_lookat_matrix(LS, 0, at, eye, up);
+	math3d_lookat_matrix(LS, 0, eye, at, up);
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	return 1;
 }
@@ -850,11 +852,11 @@ llookat(lua_State *L) {
 static int
 llookfrom(lua_State *L) {
 	struct lastack *LS = GETLS(L);
-	const float * at = vector_from_index(L, LS, 1);
-	const float * eye = vector_from_index(L, LS, 2);
+	const float * eye = vector_from_index(L, LS, 1);
+	const float * at = vector_from_index(L, LS, 2);
 	const float * up = object_from_index(L, LS, 3, LINEAR_TYPE_VEC4, vector_from_table);
 
-	math3d_lookat_matrix(LS, 1, at, eye, up);
+	math3d_lookat_matrix(LS, 1, eye, at, up);
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	return 1;
 }
@@ -1104,13 +1106,20 @@ const float *
 math3d_from_lua(lua_State *L, struct lastack *LS, int index, int type) {
 	switch(type) {
 	case LINEAR_TYPE_MAT:
-		return matrix_from_index(L, LS, type);
+		return matrix_from_index(L, LS, index);
 	case LINEAR_TYPE_VEC4:
-		return vector_from_index(L, LS, type);
+		return vector_from_index(L, LS, index);
 	case LINEAR_TYPE_QUAT:
-		return quat_from_index(L, LS, type);
+		return quat_from_index(L, LS, index);
 	default:
 		luaL_error(L, "Invalid math3d object type %d", type);
 	}
 	return NULL;
+}
+
+const float *
+math3d_from_lua_id(lua_State *L, struct lastack *LS, int index, int *type) {
+	int64_t id = get_id(L, index, lua_type(L, index));
+	*type = LINEAR_TYPE_NONE;
+	return lastack_value(LS, id, type);
 }
