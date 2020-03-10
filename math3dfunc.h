@@ -11,6 +11,8 @@ void math3d_make_srt(struct lastack *LS, const float *s, const float *r, const f
 void math3d_make_quat_from_euler(struct lastack *LS, float x, float y, float z);
 void math3d_make_quat_from_axis(struct lastack *LS, const float *axis, float radian);
 int math3d_mul_object(struct lastack *LS, const float *lval, const float *rval, int ltype, int rtype, float tmp[16]);
+void math3d_add_vec(struct lastack *LS, const float lhs[4], const float rhs[4], float r[4]);
+void math3d_sub_vec(struct lastack *LS, const float lhs[4], const float rhs[4], float r[4]);
 int math3d_decompose_matrix(struct lastack *LS, const float *mat);
 int math3d_decompose_rot(const float mat[16], float quat[4]);
 int math3d_decompose_scale(const float mat[16], float scale[4]);
@@ -35,6 +37,6 @@ void math3d_viewdir_to_quat(struct lastack *LS, const float v[3]);
 void math3d_frustumLH(struct lastack *LS, float left, float right, float bottom, float top, float near, float far, int homogeneous_depth);
 void math3d_orthoLH(struct lastack *LS, float left, float right, float bottom, float top, float near, float far, int homogeneous_depth);
 void math3d_base_axes(struct lastack *LS, const float forward[4]);
-void math3d_quat_rotate_vec(struct lastack *LS, const float quat[4], const float v[4]);
-void math3d_rotmat_rotate_vec(struct lastack *LS, const float mat[16], const float v[4]);
+void math3d_quat_transform(struct lastack *LS, const float quat[4], const float v[4]);
+void math3d_rotmat_transform(struct lastack *LS, const float mat[16], const float v[4]);
 #endif

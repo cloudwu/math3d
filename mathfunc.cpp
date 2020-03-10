@@ -87,12 +87,6 @@ math3d_mul_object(struct lastack *LS, const float *val0, const float *val1, int 
 	case BINTYPE(LINEAR_TYPE_MAT,LINEAR_TYPE_MAT):
 		mat = MAT(val0) * MAT(val1);
 		return LINEAR_TYPE_MAT;
-	case BINTYPE(LINEAR_TYPE_MAT, LINEAR_TYPE_VEC4):
-		vec = MAT(val0) * VEC(val1);
-		return LINEAR_TYPE_VEC4;
-	case BINTYPE(LINEAR_TYPE_VEC4, LINEAR_TYPE_MAT):
-		vec = VEC(val0) *MAT(val1);			
-		return LINEAR_TYPE_VEC4;
 	case BINTYPE(LINEAR_TYPE_VEC4, LINEAR_TYPE_NUM):
 		vec = VEC(val0) * val1[0];
 		return LINEAR_TYPE_VEC4;
@@ -110,6 +104,16 @@ math3d_mul_object(struct lastack *LS, const float *val0, const float *val1, int 
 	}
 
 	return LINEAR_TYPE_NONE;
+}
+
+void
+math3d_add_vec(struct lastack *LS, const float lhs[4], const float rhs[4], float r[4]){
+	*(glm::vec4*)r = VEC(lhs) + VEC(rhs);
+}
+
+void
+math3d_sub_vec(struct lastack *LS, const float lhs[4], const float rhs[4], float r[4]){
+	*(glm::vec4*)r = VEC(lhs) - VEC(rhs);
 }
 
 int
@@ -164,24 +168,24 @@ math3d_decompose_matrix(struct lastack *LS, const float *mat) {
 
 float
 math3d_length(const float *v) {
-	return glm::length(VEC(v));
+	return glm::length(VEC3(v));
 }
 
 void
 math3d_floor(struct lastack *LS, const float v[4]) {
-	glm::vec4 vv = glm::floor(VEC(v));
+	glm::vec4 vv(glm::floor(VEC3(v)), 0.f);
 	lastack_pushvec4(LS, &vv.x);
 }
 
 void
 math3d_ceil(struct lastack *LS, const float v[4]) {
-	glm::vec4 vv = glm::ceil(VEC(v));
+	glm::vec4 vv(glm::ceil(VEC3(v)), 0.f);
 	lastack_pushvec4(LS, &vv.x);
 }
 
 float
 math3d_dot(const float v1[4], const float v2[4]) {
-	return glm::dot(VEC(v1), VEC(v2));
+	return glm::dot(VEC3(v1), VEC3(v2));
 }
 
 void
@@ -326,13 +330,13 @@ math3d_base_axes(struct lastack *LS, const float forward[4]) {
 }
 
 void
-math3d_quat_rotate_vec(struct lastack *LS, const float quat[4], const float v[4]){
+math3d_quat_transform(struct lastack *LS, const float quat[4], const float v[4]){
 	const glm::vec4 vv = glm::rotate(QUAT(quat), VEC(v));
 	lastack_pushvec4(LS, &vv.x);
 }
 
 void
-math3d_rotmat_rotate_vec(struct lastack *LS, const float mat[16], const float v[4]){
+math3d_rotmat_transform(struct lastack *LS, const float mat[16], const float v[4]){
 	const glm::vec4 vv = MAT(mat) * VEC(v);
 	lastack_pushvec4(LS, &vv.x);
 }
