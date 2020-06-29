@@ -6,7 +6,9 @@ ref1.m = { s = 10, r = { axis = {1,0,0}, r = math.rad(60) },  t = { 1,2,3 } }
 local ref2 = math3d.ref()
 ref2.v = math3d.vector(1,2,3,4)
 print("ref1", ref1)
+print("ref1 value", math3d.tostring(math3d.matrix(ref1)))
 print(ref2)
+print("ref2 value", math3d.tostring(math3d.vector(ref2)))
 ref2.v = math3d.pack("dddd", 1,2,3,4)
 print(ref2)
 ref2.v = math3d.vector(ref2, 1)
@@ -21,7 +23,7 @@ for i = 1,4 do
 end
 
 print "===SRT==="
-ref1.m = { s = 2, r = { 0, math.rad(60), 0 }, t = { 1,2,3} }
+ref1.m = { s = 1, r = { 0, math.rad(60), 0 }, t = { 1,2,3} }
 print(ref1)
 local s,r,t = math3d.srt(ref1)
 print("S = ", math3d.tostring(s))
@@ -69,7 +71,15 @@ print("inverse", ref2, "=", math3d.tostring(math3d.inverse(ref2)))
 print("inverse", ref3, "=", math3d.tostring(math3d.inverse(ref3)))
 print("reciprocal", ref2, "=", math3d.tostring(math3d.reciprocal(ref2)))
 
-print "===VIEW&PROJECTION MATRIX"
+print "===MULADD==="
+do
+	local v1, v2 = math3d.vector(1, 2, 3, 0), math3d.vector(1, 0, 0, 0)
+	local p = math3d.vector(4, 1, 0, 1)
+	local r = math3d.muladd(v1, v2, p)
+	print("muladd:", math3d.tostring(v1), math3d.tostring(v2), math3d.tostring(p), "=", math3d.tostring(r))
+end
+
+print "===VIEW&PROJECTION MATRIX==="
 do
 	local eyepos = math3d.vector{0, 5, -10}
 	local at = math3d.vector {0, 0, 0}
@@ -142,12 +152,84 @@ local matrix = adapter.matrix(testfunc.matrix2, 1)	-- convert all mat
 local var = adapter.variant(testfunc.vector, testfunc.matrix1, 1)
 local format = adapter.format(testfunc.variant, testfunc.format, 2)
 local mvq = adapter.getter(testfunc.getmvq, "mvq")	-- getmvq will return matrix, vector, quat
+local matrix2_v = adapter.format(testfunc.matrix2, "mm", 1)
+local retvec = adapter.output_vector(testfunc.retvec, 1)
 print(vector(ref2, math3d.vector{1,2,3}))
 print(matrix1(ref1))
 print(matrix2(ref1,ref1))
+print(matrix2_v(ref1,ref1))
 print(matrix(ref1,ref1))
 print(var(ref1))
 print(var(ref2))
 print(format("mv", ref1, ref2))
 local m,v, q = mvq()
 print(math3d.tostring(m), math3d.tostring(v), math3d.tostring(q))
+
+local v1,v2 =retvec()
+print(math3d.tostring(v1), math3d.tostring(v2))
+
+
+print "===AABB&FRUSTUM==="
+do
+	local aabb = math3d.ref(math3d.aabb(math3d.vector(-1, 2, 3), math3d.vector(1, 2, -3), math3d.vector(-2, 3, 6)))
+	local minv, maxv = math3d.index(aabb, 1), math3d.index(aabb, 2)
+	print("aabb.min:", math3d.tostring(minv), "aabb.max:", math3d.tostring(maxv))
+
+	local transformmat = math3d.matrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 1, 3, 1)
+	aabb = math3d.aabb_transform(transformmat, aabb)
+
+	local vp = math3d.mul(math3d.projmat{aspect=60, fov=1024/768, n=0.1, f=100}, math3d.lookto(math3d.vector(0, 0, -10), math3d.vector(0, 0, 1)))
+	local frustum_planes = math3d.frustum_planes(vp)
+	local frustum_points = math3d.frustum_points(vp)
+
+	local intersectresult = math3d.frustum_intersect_aabb(frustum_planes, aabb)
+
+	print("aabb:", math3d.tostring(aabb))
+
+	local frustum_point_names = {
+		"lbn", "rbn", "ltn", "rtn",
+		"lbf", "rbf", "ltf", "rtf",
+	}
+	local frustuminfo={}
+	for i=1, 8 do
+		frustuminfo[#frustuminfo+1] = frustum_point_names[i] .. ":" .. math3d.tostring(frustum_points[i])
+	end
+	print("frustum:\n", table.concat(frustuminfo, ",\n\t"))
+
+	if intersectresult > 0 then
+		print("aabb inside frustum")
+	elseif intersectresult == 0 then
+		print("aabb intersect with frustum")
+	else
+		print("aabb outside frustum")
+	end
+
+	local center = math3d.frustum_center(frustum_points)
+	local maxradius = math3d.frustum_max_radius(frustum_points, center)
+
+	local frustum_aabb = math3d.frustum_aabb(frustum_points)
+
+	print("frusutm center:", math3d.tostring(center))
+	print("frustum max radius:", maxradius)
+
+	local f_aabb_min, f_aabb_max = math3d.index(frustum_aabb, 1), math3d.index(frustum_aabb, 2)
+	print("frusutm aabb min:", math3d.tostring(f_aabb_min), "max:", math3d.tostring(f_aabb_max))
+	local f_aabb_center, f_aabb_extents = math3d.aabb_center_extents(frustum_aabb)
+	print("frusutm aabb center:", math3d.tostring(f_aabb_center), "extents:", math3d.tostring(f_aabb_extents), "radius:", math3d.length(f_aabb_extents))
+
+	print "\t===AABB&minmax===="
+	local points = {
+		{1, 0, -1, -10},
+		{1, 2, -1, 1},
+		{1, 4, -5, 1},
+		{-2, 0, -1, 1},
+	}
+
+	local min, max = math3d.minmax(points)
+	local aabb = math3d.aabb(min, max)
+	local aabb2 = math3d.aabb()
+	aabb2 = math3d.aabb_append(aabb2, table.unpack(points))
+
+	print("minmax-aabb:", math3d.tostring(math3d.index(aabb, 1)), math3d.tostring(math3d.index(aabb, 2)))
+	print("aabb-append:", math3d.tostring(math3d.index(aabb2, 1)), math3d.tostring(math3d.index(aabb2, 2)))
+end

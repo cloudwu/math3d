@@ -9,7 +9,6 @@
 typedef enum {
 	SET_Mat = 0x01,
 	SET_Vec = 0x02,
-	SET_Array = 0x10,
 	SET_Unknown,
 }StackElemType;
 
@@ -41,7 +40,7 @@ get_pointer_variant(lua_State *L, struct lastack *LS, int index, int elemtype) {
 // upvalue3  from
 static int
 lmatrix_adapter_1(lua_State *L) {
-	struct lastack *LS = lua_touserdata(L, lua_upvalueindex(1));
+	struct lastack *LS = math3d_getLS(L);
 	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
 	int from = lua_tointeger(L, lua_upvalueindex(3));
 	void * v = get_pointer(L, LS, from, LINEAR_TYPE_MAT);
@@ -52,7 +51,7 @@ lmatrix_adapter_1(lua_State *L) {
 
 static int
 lmatrix_adapter_2(lua_State *L) {
-	struct lastack *LS = lua_touserdata(L, lua_upvalueindex(1));
+	struct lastack *LS = math3d_getLS(L);
 	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
 	int from = lua_tointeger(L, lua_upvalueindex(3));
 	void * v1 = getopt_pointer(L, LS, from, LINEAR_TYPE_MAT);
@@ -73,7 +72,7 @@ lmatrix_adapter_2(lua_State *L) {
 
 static int
 lmatrix_adapter_var(lua_State *L) {
-	struct lastack *LS = lua_touserdata(L, lua_upvalueindex(1));
+	struct lastack *LS = math3d_getLS(L);
 	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
 	int from = lua_tointeger(L, lua_upvalueindex(3));
 	int i;
@@ -124,7 +123,7 @@ lbind_matrix(lua_State *L) {
 
 static int
 lvector(lua_State *L) {
-	struct lastack *LS = lua_touserdata(L, lua_upvalueindex(1));
+	struct lastack *LS = math3d_getLS(L);
 	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
 	const int from = lua_tointeger(L, lua_upvalueindex(3));
 
@@ -161,62 +160,12 @@ lbind_vector(lua_State *L) {
 static uint8_t
 check_elem_type(lua_State *L, struct lastack *LS, int index) {	
 	if (lua_type(L, index) == LUA_TTABLE) {
-		const int fieldtype = lua_getfield(L, index, "n");	
-		lua_pop(L, 1);
-
-		if (fieldtype != LUA_TNIL){
-			const int elemtype = lua_geti(L, index, 1);			
-			if (elemtype != LUA_TTABLE) {
-				int type;
-				math3d_from_lua_id(L, LS, -1, &type);
-				lua_pop(L, 1);
-				return SET_Array | (type == LINEAR_TYPE_MAT ? SET_Mat : SET_Vec);
-			} 
-
-			lua_pop(L, 1);
-			return SET_Array | (lua_rawlen(L, index) >= 12 ? SET_Mat : SET_Vec);
-		}
 		return lua_rawlen(L, index) >= 12 ? SET_Mat : SET_Vec;
 	}
 
 	int type;
 	math3d_from_lua_id(L, LS, index, &type);
 	return type == LINEAR_TYPE_MAT ? SET_Mat : SET_Vec;
-}
-
-static void
-unpack_table_on_stack(lua_State *L, struct lastack *LS, int from, int top, int elemtype) {
-	int stackidx;
-	for (stackidx = from; stackidx <= top; ++stackidx) {
-		if (lua_getfield(L, stackidx, "n") != LUA_TNIL) {
-			const int num = (int)lua_tointeger(L, -1);
-			lua_pop(L, 1);	// pop 'n'	
-
-			const int tablenum = (int)lua_rawlen(L, stackidx);
-			if (num != tablenum) {
-				luaL_error(L, "'n' field: %d not equal to table count: %d", num, tablenum);
-			}
-
-			int tblidx;
-			for (tblidx = 0; tblidx < num; ++tblidx) {
-				lua_geti(L, stackidx, tblidx + 1);				
-				void * v = get_pointer_variant(L, LS, -1, elemtype);
-				if (v) {
-					lua_pop(L, 1);	// pop lua_geti value
-					lua_pushlightuserdata(L, v);
-				} else {
-					luaL_checktype(L, -1, LUA_TTABLE);
-				}
-
-				// v == NULL will not pop, make it in the stack
-			}
-		}
-	}
-
-	int ii;
-	for (ii = 0; ii <= top - from; ++ii) {
-		lua_remove(L, from);
-	}
 }
 
 static void
@@ -237,16 +186,12 @@ convert_stack_value(lua_State *L, struct lastack *LS, int from, int top, int ele
 // upvalue4 integer from
 static int
 lvariant(lua_State *L) {
-	struct lastack *LS = lua_touserdata(L, lua_upvalueindex(1));
+	struct lastack *LS = math3d_getLS(L);
 	const int from = lua_tointeger(L, lua_upvalueindex(4));
 	const int top = lua_gettop(L);
 	const uint8_t elemtype = check_elem_type(L, LS, from);	
-	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex((elemtype & SET_Mat) ? 2 : 3));
-	if (elemtype & SET_Array) {
-		unpack_table_on_stack(L, LS, from, top, elemtype);
-	} else {		
-		convert_stack_value(L, LS, from, top, elemtype);
-	}
+	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex((elemtype == SET_Mat) ? 2 : 3));
+	convert_stack_value(L, LS, from, top, elemtype);
 	return f(L);
 }
 
@@ -276,15 +221,10 @@ lbind_variant(lua_State *L) {
 }
 
 static int
-lformat(lua_State *L) {
-	struct lastack *LS = lua_touserdata(L, lua_upvalueindex(1));
+lformat(lua_State *L, const char *format) {
+	struct lastack *LS = math3d_getLS(L);
 	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
-	lua_CFunction getformat = lua_tocfunction(L, lua_upvalueindex(3));
 	int from = lua_tointeger(L, lua_upvalueindex(4));
-	if (getformat(L) != 1 || lua_type(L, -1) != LUA_TLIGHTUSERDATA)
-		luaL_error(L, "Invalid format C function");
-	const char *format = (const char *)lua_touserdata(L, -1);
-	lua_pop(L, 1);
 	int i;
 	int top = lua_gettop(L);
 	void *v = NULL;
@@ -312,6 +252,22 @@ lformat(lua_State *L) {
 	return f(L);
 }
 
+static int
+lformat_function(lua_State *L) {
+	lua_CFunction getformat = lua_tocfunction(L, lua_upvalueindex(3));
+	if (getformat(L) != 1 || lua_type(L, -1) != LUA_TLIGHTUSERDATA)
+		luaL_error(L, "Invalid format C function");
+	const char *format = (const char *)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	return lformat(L, format);
+}
+
+static int
+lformat_string(lua_State *L) {
+	const char *format = lua_tostring(L, lua_upvalueindex(3));
+	return lformat(L, format);
+}
+
 // upvalue1: userdata mathstack
 // cfunction original function
 // cfunction function return (void *)format
@@ -322,8 +278,12 @@ lbind_format(lua_State *L) {
 		return luaL_error(L, "need a c function");
 	if (lua_getupvalue(L, 1, 1) != NULL)
 		luaL_error(L, "Only support light cfunction");
-	if (!lua_iscfunction(L, 2))
-		return luaL_error(L, "need a c function");
+	int string_version = 0;
+	if (lua_isstring(L, 2)) {
+		string_version = 1;
+	} else if (!lua_iscfunction(L, 2)) {
+		return luaL_error(L, "need a c format function or string");
+	}
 	if (lua_getupvalue(L, 2, 1) != NULL)
 		luaL_error(L, "Only support light cfunction");
 	luaL_checkinteger(L, 3);
@@ -333,7 +293,11 @@ lbind_format(lua_State *L) {
 	lua_pushvalue(L, 2);
 	lua_pushvalue(L, 3);
 
-	lua_pushcclosure(L, lformat, 4);
+	if (string_version) {
+		lua_pushcclosure(L, lformat_string, 4);
+	} else {
+		lua_pushcclosure(L, lformat_function, 4);
+	}
 	return 1;
 }
 
@@ -345,7 +309,7 @@ struct stack_buf {
 static int
 get_n(lua_State *L, int n, struct stack_buf *prev) {
 	if (n == 0) {
-		struct lastack *LS = lua_touserdata(L, lua_upvalueindex(1));
+		struct lastack *LS = math3d_getLS(L);
 		lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
 		size_t sz = 0;
 		const char *format = lua_tolstring(L, lua_upvalueindex(3), &sz);
@@ -417,6 +381,77 @@ lbind_getter(lua_State *L) {
 	return 1;
 }
 
+static int
+loutput_object(lua_State *L, int ltype) {
+	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
+	int retn = f(L);
+	int from = lua_tointeger(L, lua_upvalueindex(3));
+	int top = lua_gettop(L);
+	if (retn > from) {
+		lua_settop(L, retn);
+		top = retn;
+	}
+	from = top - retn + from;
+	int i;
+	struct lastack *LS = math3d_getLS(L);
+
+	for (i=from;i<=top;i++) {
+		if (lua_type(L, i) != LUA_TLIGHTUSERDATA) {
+			return luaL_error(L, "ret %d should be a lightuserdata", i);
+		}
+		const float *v = (const float *)lua_touserdata(L, i);
+		lastack_pushobject(LS, v, ltype);
+		lua_pushlightuserdata(L, (void *)(lastack_pop(LS)));
+		lua_replace(L, i);
+	}
+	return retn;
+}
+
+static int
+loutput_matrix(lua_State *L) {
+	return loutput_object(L, LINEAR_TYPE_MAT);
+}
+
+static int
+loutput_vector(lua_State *L) {
+	return loutput_object(L, LINEAR_TYPE_VEC4);
+}
+
+static int
+loutput_quat(lua_State *L) {
+	return loutput_object(L, LINEAR_TYPE_QUAT);
+}
+
+// upvalue1 : userdata mathstack
+// cfunction original output
+// integer from
+static int
+lbind_output(lua_State *L, lua_CFunction output_func) {
+	if (!lua_iscfunction(L, 1))
+		return luaL_error(L, "need a c function");
+	luaL_checkinteger(L, 2);
+	lua_pushvalue(L, lua_upvalueindex(1));
+	lua_pushvalue(L, 1);
+	lua_pushvalue(L, 2);
+	lua_pushcclosure(L, output_func, 3);
+	return 1;
+}
+
+static int
+lbind_output_matrix(lua_State *L) {
+	return lbind_output(L, loutput_matrix);
+}
+
+static int
+lbind_output_vector(lua_State *L) {
+	return lbind_output(L, loutput_vector);
+}
+
+static int
+lbind_output_quat(lua_State *L) {
+	return lbind_output(L, loutput_quat);
+}
+
 LUAMOD_API int
 luaopen_math3d_adapter(lua_State *L) {
 	luaL_checkversion(L);
@@ -427,6 +462,9 @@ luaopen_math3d_adapter(lua_State *L) {
 		{ "variant", lbind_variant },
 		{ "format", lbind_format },
 		{ "getter", lbind_getter },
+		{ "output_matrix", lbind_output_matrix },
+		{ "output_vector", lbind_output_vector },
+		{ "output_quat", lbind_output_quat },
 		{ NULL, NULL },
 	};
 
@@ -437,7 +475,7 @@ luaopen_math3d_adapter(lua_State *L) {
 	}
 	struct boxstack * bs = lua_touserdata(L, -1);
 	lua_pop(L, 1);
-	lua_pushlightuserdata(L, bs->LS);
+	lua_pushlightuserdata(L, bs);
 
 	luaL_setfuncs(L,l,1);
 

@@ -79,11 +79,11 @@ struct lastack {
 
 #define TAG_FREE 0
 #define TAG_USED 1
-#define TAG_WILLFREE 2
 
 struct slot {
-	uint32_t id : 30;
-	uint32_t tag : 2;
+	uint32_t list : 31;
+	uint32_t tag : 1;
+	int version;
 };
 
 struct oldpage {
@@ -107,10 +107,11 @@ init_blob_slots(struct blob * B, int slot_beg, int slot_end) {
 	int i;
 	for (i = slot_beg; i < slot_end; ++i) {
 		B->s[i].tag = TAG_FREE;
-		B->s[i].id = i + 2;
+		B->s[i].version = 0;
+		B->s[i].list = i + 2;
 	}
 	
-	B->s[slot_end - 1].id = 0;
+	B->s[slot_end - 1].list = 0;
 	B->freeslot = slot_beg + 1;
 }
 
@@ -167,16 +168,16 @@ blob_alloc(struct blob *B, int version) {
 	}
 	int ret = SLOT_INDEX(B->freeslot);
 	struct slot *s = &B->s[ret];
-	B->freeslot = s->id;	// next free slot
+	B->freeslot = s->list;	// next free slot
 	s->tag = TAG_USED;
-	s->id = version;
+	s->version = version;
 	return ret;
 }
 
 static void *
 blob_address(struct blob *B, int index, int version) {
 	struct slot *s = &B->s[index];
-	if (s->tag != TAG_USED || s->id != version)
+	if (s->version != version)
 		return NULL;
 	return B->buffer + index * B->size;
 }
@@ -184,10 +185,10 @@ blob_address(struct blob *B, int index, int version) {
 static void
 blob_dealloc(struct blob *B, int index, int version) {
 	struct slot *s = &B->s[index];
-	if (s->tag != TAG_USED || s->id != version)
+	if (s->tag != TAG_USED || s->version != version)
 		return;
-	s->id = B->freelist;
-	s->tag = TAG_WILLFREE;
+	s->list = B->freelist;
+	s->tag = TAG_FREE;
 	B->freelist = index + 1;
 }
 
@@ -196,14 +197,14 @@ blob_flush(struct blob *B) {
 	int slot = B->freelist;
 	while (slot) {
 		struct slot *s = &B->s[SLOT_INDEX(slot)];
-		s->tag = TAG_FREE;
-		if (SLOT_EMPTY(s->id)) {
-			s->id = B->freeslot;
+		s->version = 0;
+		if (SLOT_EMPTY(s->list)) {
+			s->list = B->freeslot;
 			B->freeslot = B->freelist;
 			B->freelist = 0;
 			break;
 		}
-		slot = s->id;
+		slot = s->list;
 	}
 	free_oldpage(B->old);
 	B->old = NULL;
@@ -221,18 +222,13 @@ blob_delete(struct blob *B) {
 }
 
 static void
-print_list(struct blob *B, const char * h, int list, int tag) {
+print_list(struct blob *B, const char * h, int list) {
 	printf("%s ", h);
 	while (!SLOT_EMPTY(list)) {
 		int index = SLOT_INDEX(list);
 		struct slot *s = &B->s[index];
-		if (s->tag == tag) {
-			printf("%d,", SLOT_INDEX(list));
-		} else {
-			printf("%d [ERROR]", SLOT_INDEX(list));
-			break;
-		}
-		list = s->id;
+		printf("%d,", SLOT_INDEX(list));
+		list = s->list;
 	}
 	printf("\n");
 }
@@ -247,8 +243,8 @@ blob_print(struct blob *B) {
 		}
 	}
 	printf("\n");
-	print_list(B, "FREE :", B->freeslot, TAG_FREE);
-	print_list(B, "WILLFREE :", B->freelist, TAG_WILLFREE);
+	print_list(B, "FREE :", B->freeslot);
+	print_list(B, "WILLFREE :", B->freelist);
 }
 
 #if 0
@@ -362,10 +358,9 @@ check_matrix_pool(struct lastack *LS) {
 	return LS->temp_mat + LS->temp_matrix_top * MATRIX;
 }
 
-void
-lastack_pushmatrix(struct lastack *LS, const float *mat) {
+float *
+lastack_allocmatrix(struct lastack *LS) {
 	float * pmat = check_matrix_pool(LS);
-	memcpy(pmat, mat, sizeof(float) * MATRIX);
 	union stackid sid;
 	sid.s.type = LINEAR_TYPE_MAT;
 	sid.s.persistent = 0;
@@ -373,6 +368,13 @@ lastack_pushmatrix(struct lastack *LS, const float *mat) {
 	sid.s.id = LS->temp_matrix_top;
 	push_id(LS, sid);
 	++ LS->temp_matrix_top;
+	return pmat;
+}
+
+void
+lastack_pushmatrix(struct lastack *LS, const float *mat) {
+	float * pmat = lastack_allocmatrix(LS);
+	memcpy(pmat, mat, sizeof(float) * MATRIX);
 }
 
 void
@@ -445,14 +447,9 @@ lastack_pushsrt(struct lastack *LS, const float *s, const float *r, const float 
 	++ LS->temp_matrix_top;
 }
 
-void
-lastack_pushobject(struct lastack *LS, const float *v, int type) {
-	if (type == LINEAR_TYPE_MAT) {
-		lastack_pushmatrix(LS, v);
-		return;
-	}
+static inline float *
+alloc_float4(struct lastack *LS, int type) {
 	assert(type >= LINEAR_TYPE_VEC4 && type <= LINEAR_TYPE_QUAT);
-	const int size = lastack_typesize(type);
 	if (LS->temp_vector_top >= LS->temp_vector_cap) {
 		size_t sz = LS->temp_vector_cap * sizeof(float) * VECTOR4;
 		void * p = new_page(LS, LS->temp_vec, sz);
@@ -460,7 +457,8 @@ lastack_pushobject(struct lastack *LS, const float *v, int type) {
 		memcpy(LS->temp_vec, p, sz);
 		LS->temp_vector_cap *= 2;
 	}
-	memcpy(LS->temp_vec + LS->temp_vector_top * VECTOR4, v, sizeof(float) * size);
+
+	float * result = LS->temp_vec + LS->temp_vector_top * VECTOR4;
 	union stackid sid;
 	sid.s.type = type;
 	sid.s.persistent = 0;
@@ -468,16 +466,40 @@ lastack_pushobject(struct lastack *LS, const float *v, int type) {
 	sid.s.id = LS->temp_vector_top;
 	push_id(LS, sid);
 	++ LS->temp_vector_top;
+	return result;
+}
+
+void
+lastack_pushobject(struct lastack *LS, const float *v, int type) {
+	if (type == LINEAR_TYPE_MAT) {
+		lastack_pushmatrix(LS, v);
+		return;
+	}
+	float * buf = alloc_float4(LS, type);
+	const int size = lastack_typesize(type);
+	memcpy(buf, v, sizeof(float) * size);
 }
 
 void
 lastack_pushvec4(struct lastack *LS, const float *vec4) {
-	lastack_pushobject(LS, vec4, LINEAR_TYPE_VEC4);
+	float * buf = alloc_float4(LS, LINEAR_TYPE_VEC4);
+	memcpy(buf, vec4, sizeof(float) * 4);
+}
+
+float *
+lastack_allocvec4(struct lastack *LS) {
+	return alloc_float4(LS, LINEAR_TYPE_VEC4);
 }
 
 void
 lastack_pushquat(struct lastack *LS, const float *v) {
-	lastack_pushobject(LS, v, LINEAR_TYPE_QUAT);
+	float * buf = alloc_float4(LS, LINEAR_TYPE_QUAT);
+	memcpy(buf, v, sizeof(float) * 4);
+}
+
+float *
+lastack_allocquat(struct lastack *LS) {
+	return alloc_float4(LS, LINEAR_TYPE_QUAT);
 }
 
 const float *
@@ -562,7 +584,6 @@ lastack_mark(struct lastack *LS, int64_t tempid) {
 	int t;
 	const float *address = lastack_value(LS, tempid, &t);
 	if (address == NULL) {
-		//printf("--- mark address = null ---");
 		return 0;
 	}
 	int id;
@@ -580,7 +601,6 @@ lastack_mark(struct lastack *LS, int64_t tempid) {
 	}
 	sid.s.id = id;
 	if (sid.s.id != id) {
-		//printf(" --- s.id(%d) != id(%d) --- \n ",sid.s.id,id);
 		return 0;
 	}
 	sid.s.persistent = 1;

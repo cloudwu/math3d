@@ -13,13 +13,16 @@ $(ODIR)/linalg.o : linalg.c | $(ODIR)
 $(ODIR)/math3d.o : math3d.c | $(ODIR)
 	$(CC) -c $(CFLAGS) -o $@ $^ $(LUAINC)
 
-$(ODIR)/mathfunc.o : mathfunc.cpp | $(ODIR)
+$(ODIR)/math3dfunc.o : math3dfunc.cpp | $(ODIR)
 	$(CXX) -c $(CFLAGS) -Wno-char-subscripts -o $@ $^ $(GLM_INC)
 
 $(ODIR)/mathadapter.o : mathadapter.c | $(ODIR)
 	$(CC) -c $(CFLAGS) -o $@ $^ $(LUAINC)
 
-$(OUTPUT)math3d.dll : $(ODIR)/linalg.o $(ODIR)/math3d.o $(ODIR)/mathfunc.o $(ODIR)/mathadapter.o
+$(ODIR)/testadapter.o : testadapter.c | $(ODIR)
+	$(CC) -c $(CFLAGS) -o $@ $^ $(LUAINC)
+
+$(OUTPUT)math3d.dll : $(ODIR)/linalg.o $(ODIR)/math3d.o $(ODIR)/math3dfunc.o $(ODIR)/mathadapter.o $(ODIR)/testadapter.o
 	$(CXX) --shared $(CFLAGS) -o $@ $^ -lstdc++ $(LUALIB)
 
 $(ODIR) :
