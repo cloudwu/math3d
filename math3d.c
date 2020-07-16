@@ -152,8 +152,8 @@ assign_id(lua_State *L, struct lastack *LS, int index, int mtype, int ltype) {
 }
 
 static void
-unpack_numbers(lua_State *L, int index, float *v, int n) {
-	int i;
+unpack_numbers(lua_State *L, int index, float *v, size_t n) {
+	size_t i;
 	for (i=0;i<n;i++) {
 		if (lua_geti(L, index, i+1) != LUA_TNUMBER) {
 			luaL_error(L, "Need a number from index %d", i+1);
@@ -167,7 +167,7 @@ typedef int64_t (*from_table_func)(lua_State *L, struct lastack *LS, int index);
 
 static int64_t
 vector_from_table(lua_State *L, struct lastack *LS, int index) {
-	int n = getlen(L, index);
+	size_t n = getlen(L, index);
 	if (n != 3 && n != 4)
 		return luaL_error(L, "Vector need a array of 3/4 (%d)", n);
 	float *v = lastack_allocvec4(LS);
@@ -232,7 +232,7 @@ quat_from_axis(lua_State *L, struct lastack *LS, int index, const char *key) {
 
 static int64_t
 quat_from_table(lua_State *L, struct lastack *LS, int index) {
-	int n = getlen(L, index);
+	size_t n = getlen(L, index);
 	if (n == 0) {
 		if (quat_from_axis(L, LS, index, "axis"))
 			return luaL_error(L, "Quat invalid arguments");
@@ -252,7 +252,7 @@ quat_from_table(lua_State *L, struct lastack *LS, int index) {
 
 static int64_t
 matrix_from_table(lua_State *L, struct lastack *LS, int index) {
-	int n = getlen(L, index);
+	size_t n = getlen(L, index);
 	if (n == 0) {
 		const float *s;
 		float tmp[4];
@@ -366,8 +366,23 @@ assign_trans(lua_State *L, struct lastack *LS, int index, int64_t oid) {
 	return lastack_mark(LS, lastack_pop(LS));
 }
 
+static void
+set_index_object(lua_State *L, struct lastack *LS, int64_t id);
+
 static int
-lref_setter(lua_State *L) {
+ref_set_number(lua_State *L){
+	struct refobject *R = lua_touserdata(L, 1);
+	struct lastack *LS = GETLS(L);
+	const int64_t oid = R->id;
+
+	set_index_object(L, LS, oid);
+	R->id = lastack_mark(LS, lastack_pop(LS));
+	lastack_unmark(LS, oid);
+	return 0;
+}
+
+static int
+ref_set_key(lua_State *L){
 	struct refobject *R = lua_touserdata(L, 1);
 	const char *key = luaL_checkstring(L, 2);
 	struct lastack *LS = GETLS(L);
@@ -405,6 +420,19 @@ lref_setter(lua_State *L) {
 	}
 	lastack_unmark(LS, oid);
 	return 0;
+}
+
+static int
+lref_setter(lua_State *L) {
+	int type = lua_type(L, 2);
+	switch (type) {
+	case LUA_TNUMBER:
+		return ref_set_number(L);
+	case LUA_TSTRING:
+		return ref_set_key(L);
+	default:
+		return luaL_error(L, "Invalid key type %s", lua_typename(L, type));
+	}
 }
 
 static void
@@ -522,14 +550,6 @@ ref_get_number(lua_State *L) {
 		return luaL_error(L, "Invalid ref object");
 	}
 	return index_object(L, LS, R->id, idx);
-}
-
-
-static int
-lindex(lua_State *L) {
-	int64_t id = get_id(L, 1, lua_type(L, 1));
-	int idx = luaL_checkinteger(L, 2);
-	return index_object(L, GETLS(L), id, idx);
 }
 
 
@@ -750,6 +770,61 @@ quat_from_index(lua_State *L, struct lastack *LS, int index) {
 }
 
 static int
+lindex(lua_State *L) {
+	int64_t id = get_id(L, 1, lua_type(L, 1));
+	int idx = luaL_checkinteger(L, 2);
+	return index_object(L, GETLS(L), id, idx);
+}
+
+static void
+set_index_object(lua_State *L, struct lastack *LS, int64_t id){
+	int type;
+	const float * v = lastack_value(LS, id, &type);
+	if (v == NULL) {
+		luaL_error(L, "Invalid ref object");
+		return;
+	}
+
+	int idx = luaL_checkinteger(L, 2);
+	if (idx < 1 || idx > 4) {
+		luaL_error(L, "Invalid index %d", idx);
+		return;
+	}
+	--idx;
+
+	switch (type)
+	{
+	case LINEAR_TYPE_MAT:{
+		const float* nv = vector_from_index(L, LS, 3);
+		float vv[16]; memcpy(vv, v, sizeof(vv));
+		memcpy(vv + idx * 4, nv, sizeof(float) * 4);
+		lastack_pushmatrix(LS, vv);
+	}
+		break;
+	case LINEAR_TYPE_VEC4:
+	case LINEAR_TYPE_QUAT:{
+		float vv[4]; memcpy(vv, v, sizeof(vv));
+		vv[idx] = luaL_checknumber(L, 3);
+		lastack_pushvec4(LS, vv);
+	}
+		break;
+	default:
+		luaL_error(L, "invalid data type:%s", lastack_typename(type));
+	}
+}
+
+
+static int
+lset_index(lua_State *L){
+	struct lastack *LS  = GETLS(L);
+	int64_t id = get_id(L, 1, lua_type(L, 1));
+
+	set_index_object(L, LS, id);
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
+	return 1;
+}
+
+static int
 lmul(lua_State *L) {
 	struct lastack *LS = GETLS(L);
 	if (lua_isnumber(L, 1)) {
@@ -871,7 +946,11 @@ lquaternion(lua_State *L) {
 static int
 lsrt(lua_State *L) {
 	struct lastack *LS = GETLS(L);
-	const float * mat = matrix_from_index(L, LS, 1);
+	int type;
+	const float *mat = get_object(L, LS, 1, &type);
+	if (type != LINEAR_TYPE_MAT || mat == NULL){
+		luaL_error(L, "invalid type:%s", lastack_typename(type));
+	}
 	math3d_decompose_matrix(LS, mat);
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
@@ -974,6 +1053,16 @@ linverse(lua_State *L) {
 	default:
 		return luaL_error(L, "inverse don't support %s", lastack_typename(type));
 	}
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
+	return 1;
+}
+
+static int
+linverse_fast(lua_State *L){
+	struct lastack *LS = GETLS(L);
+	const float * mat = matrix_from_index(L, LS, 1);
+	math3d_inverse_matrix_fast(LS, mat);
+
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	return 1;
 }
@@ -1194,6 +1283,8 @@ lminmax(lua_State *L){
 
 	const float* transform = lua_isnoneornil(L, 2) ? NULL : matrix_from_index(L, LS, 2);
 
+	lastack_preallocfloat4(LS, 2);
+
 	float *minv = alloc_vec4(L, LS);
 	minv[0] = FLT_MAX;
 	minv[1] = FLT_MAX;
@@ -1227,6 +1318,16 @@ llerp(lua_State *L){
 	float *r = alloc_vec4(L, LS);
 
 	math3d_lerp(LS, v0, v1, ratio, r);
+	return 1;
+}
+
+static int
+lmatrix_scale(lua_State *L){
+	struct lastack *LS = GETLS(L);
+	const float *m = matrix_from_index(L, LS, 1);
+	float *scale = lastack_allocvec4(LS);
+	math3d_decompose_scale(m, scale);
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	return 1;
 }
 
@@ -1285,6 +1386,16 @@ lpack(lua_State *L) {
 		lastack_pushmatrix(LS, u.f);
 	}
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
+	return 1;
+}
+
+static int
+lisvalid(lua_State *L){
+	struct lastack *LS = GETLS(L);
+	int type;
+	int64_t id = get_id(L, 1, lua_type(L, 1));
+	const float * v = lastack_value(LS, id, &type);
+	lua_pushboolean(L, v != NULL);
 	return 1;
 }
 
@@ -1435,11 +1546,22 @@ static int
 laabb_center_extents(lua_State *L){
 	struct lastack *LS = GETLS(L);
 	const float *aabb = matrix_from_index(L, LS, 1);
+	lastack_preallocfloat4(LS, 2);
 	float *center = alloc_vec4(L, LS);
 	float *extents= alloc_vec4(L, LS);
 	math3d_aabb_center_extents(LS, aabb, center, extents);
 
 	return 2;
+}
+
+static int
+laabb_intersect_plane(lua_State *L){
+	struct lastack *LS = GETLS(L);
+	const float *aabb = matrix_from_index(L, LS, 1);
+	const float *plane = vector_from_index(L, LS, 2);
+
+	lua_pushinteger(L, math3d_aabb_intersect_plane(LS, aabb, plane));
+	return 1;
 }
 
 //frustum
@@ -1450,6 +1572,7 @@ lfrustum_planes(lua_State *L){
 	float *planes[6];
 	int i;
 	lua_createtable(L, 6, 0);
+	lastack_preallocfloat4(LS, 6);
 	for (i=0;i<6;i++) {
 		planes[i] = alloc_vec4(L, LS);
 		lua_seti(L, -2, i+1);
@@ -1461,7 +1584,7 @@ lfrustum_planes(lua_State *L){
 
 static inline void
 fetch_vectors_from_table(lua_State *L, struct lastack *LS, int index, int checknum, const float** vectors){
-	const int num = getlen(L, index);
+	const size_t num = getlen(L, index);
 	if (num != checknum){
 		luaL_error(L, "table need contain %d planes:%d", checknum, num);
 	}
@@ -1509,7 +1632,10 @@ lfrustum_intersect_aabb_list(lua_State *L){
 		//	table: eid=value
 		//		value: {aabb=...}
 		const lua_Integer eid = lua_tointeger(L, -2);	//table key
-		const float * aabb = object_from_field(L, LS, -1, "aabb", LINEAR_TYPE_MAT, matrix_from_table);
+
+		const float * aabb = (LUA_TNIL != lua_getfield(L, -1, "aabb")) ?
+			object_from_index(L, LS, -1, LINEAR_TYPE_MAT, matrix_from_table) : NULL;
+		lua_pop(L, 1);
 
 		if (aabb == NULL || math3d_frustum_intersect_aabb(LS, planes, aabb) >= 0){
 			lua_pushvalue(L, -1);	//-1 is table value
@@ -1531,6 +1657,7 @@ lfrustum_points(lua_State *L){
 	lua_createtable(L, 8, 0);
 	float *points[8];
 	int i;
+	lastack_preallocfloat4(LS, 8);
 	for (i=0;i<8;i++) {
 		points[i] = alloc_vec4(L, LS);
 		lua_seti(L, -2, i+1);
@@ -1586,6 +1713,16 @@ lfrustum_calc_near_far(lua_State *L){
 	return 2;
 }
 
+static int
+lpoint2plane(lua_State *L){
+	struct lastack *LS = GETLS(L);
+	const float *pt = vector_from_index(L, LS, 1);
+	const float *plane = vector_from_index(L, LS, 2);
+
+	lua_pushnumber(L, math3d_point2plane(LS, pt, plane));
+	return 1;
+}
+
 static void
 init_math3d_api(lua_State *L, struct boxstack *bs) {
 		luaL_Reg l[] = {
@@ -1595,6 +1732,7 @@ init_math3d_api(lua_State *L, struct boxstack *bs) {
 		{ "vector", lvector },
 		{ "quaternion", lquaternion },
 		{ "index", lindex },
+		{ "set_index", lset_index},
 		{ "reset", lreset },
 		{ "mul", lmul },
 		{ "add", ladd },
@@ -1609,6 +1747,7 @@ init_math3d_api(lua_State *L, struct boxstack *bs) {
 		{ "normalize", lnormalize },
 		{ "transpose", ltranspose },
 		{ "inverse", linverse },
+		{ "inverse_fast", linverse_fast},
 		{ "lookat", llookat },
 		{ "lookto", llookto },
 		{ "reciprocal", lreciprocal },
@@ -1622,6 +1761,7 @@ init_math3d_api(lua_State *L, struct boxstack *bs) {
 		{ "projmat", lprojmat },
 		{ "minmax", lminmax},
 		{ "lerp", llerp},
+		{ "matrix_scale", lmatrix_scale},
 		{ "quat2euler", lquat2euler},
 		{ "dir2radian", ldir2radian},
 		{ "forward_dir",lforward_dir},
@@ -1629,6 +1769,7 @@ init_math3d_api(lua_State *L, struct boxstack *bs) {
 		{ "set_homogeneous_depth", lset_homogeneous_depth},
 		{ "set_origin_bottom_left", lset_origin_bottom_left},
 		{ "pack", lpack },
+		{ "isvalid", lisvalid},
 
 		//aabb
 		{ "aabb", laabb},
@@ -1637,6 +1778,7 @@ init_math3d_api(lua_State *L, struct boxstack *bs) {
 		{ "aabb_merge", laabb_merge},
 		{ "aabb_transform", laabb_transform},
 		{ "aabb_center_extents", laabb_center_extents},
+		{ "aabb_intersect_plane", laabb_intersect_plane},
 
 		//frustum
 		{ "frustum_planes", 		lfrustum_planes},
@@ -1647,6 +1789,9 @@ init_math3d_api(lua_State *L, struct boxstack *bs) {
 		{ "frustum_center",			lfrustum_center},
 		{ "frustum_max_radius",		lfrustum_max_radius},
 		{ "frustum_calc_near_far",  lfrustum_calc_near_far},
+
+		//primitive
+		{ "point2plane",	lpoint2plane},
 		{ NULL, NULL },
 	};
 

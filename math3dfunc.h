@@ -29,6 +29,7 @@ void math3d_mulH(struct lastack *LS, const float mat[16], const float vec[4]);
 void math3d_normalize_vector(struct lastack *LS, const float v[4]);
 void math3d_normalize_quat(struct lastack *LS, const float v[4]);
 void math3d_inverse_matrix(struct lastack *LS, const float mat[16]);
+void math3d_inverse_matrix_fast(struct lastack *LS, const float mat[16]);
 void math3d_inverse_quat(struct lastack *LS, const float quat[4]);
 void math3d_transpose_matrix(struct lastack *LS, const float mat[16]);
 void math3d_lookat_matrix(struct lastack *LS, int direction, const float eye[3], const float at[3], const float *up);
@@ -52,6 +53,7 @@ int math3d_aabb_isvalid(struct lastack *LS, const float *aabb);
 void math3d_aabb_transform(struct lastack *LS, const float trans[16], const float aabb[16], float raabb[16]);
 void math3d_aabb_center_extents(struct lastack *LS, const float *aabb, float center[4], float extents[4]);
 float math3d_aabb_diagonal_length(struct lastack *LS, const float *aabb);
+int math3d_aabb_intersect_plane(struct lastack *LS, const float *aabb, const float plane[4]);
 
 //frustum
 void math3d_frustum_planes(struct lastack *LS, const float m[16], float *planes[6]);
@@ -61,4 +63,7 @@ void math3d_frusutm_aabb(struct lastack *LS, const float* points[8], float *aabb
 void math3d_frustum_center(struct lastack *LS, const float *points[8], float *center);
 float math3d_frustum_max_radius(struct lastack *LS, const float *points[8], const float center[4]);
 void math3d_frustum_calc_near_far(struct lastack *LS, const float *planes[6], float nearfar[2]);
+
+//primitive
+float math3d_point2plane(struct lastack *LS, const float pt[4], const float plane[4]);
 #endif

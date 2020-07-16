@@ -180,6 +180,8 @@ math3d_decompose_rot(const float mat[16], float quat[4]) {
 void
 math3d_decompose_matrix(struct lastack *LS, const float *mat) {
 	const glm::mat4x4 &m = *(const glm::mat4x4 *)mat;
+
+	lastack_preallocfloat4(LS, 3);
 	float *trans = lastack_allocvec4(LS);
 	glm::quat &q = allocquat(LS);
 	float *scale = lastack_allocvec4(LS);
@@ -283,6 +285,21 @@ math3d_inverse_matrix(struct lastack *LS, const float mat[16]) {
 }
 
 void
+math3d_inverse_matrix_fast(struct lastack *LS, const float mat[16]) {
+	glm::mat4x4 &r = allocmat(LS);
+	auto &m = MAT(mat);
+	glm::mat3x3 m3(m);
+
+	auto d01 = glm::dot(m3[0], m3[1]);
+	auto d12 = glm::dot(m3[1], m3[2]);
+	auto d20 = glm::dot(m3[2], m3[0]);
+	//assert(is_zero() && is_zero(glm::dot(m3[1], m3[2])) && is_zero(glm::dot(m3[2], m3[0])));
+	assert(is_zero(d01, 10e-6f) && is_zero(d12, 10e-6f) && is_zero(d20, 10e-6f));
+	glm::transpose(m3);
+	r = glm::mat4(m3) * glm::translate(glm::mat4(1.f), glm::vec3(-m[3]));
+}
+
+void
 math3d_inverse_quat(struct lastack *LS, const float quat[4]) {
 	glm::quat &q = allocquat(LS);
 	q = glm::inverse(QUAT(quat));
@@ -358,6 +375,7 @@ math3d_orthoLH(struct lastack *LS, float left, float right, float bottom, float 
 
 void
 math3d_base_axes(struct lastack *LS, const float forward[4]) {
+	lastack_preallocfloat4(LS, 2);
 	glm::vec4 &up = allocvec4(LS);
 	glm::vec4 &right = allocvec4(LS);
 
@@ -514,6 +532,58 @@ math3d_aabb_diagonal_length(struct lastack *LS, const float *aabb){
 	return glm::length(VEC3(&maxv.x) - VEC3(&minv.x));
 }
 
+static inline int
+plane_intersect(const glm::vec4& plane, const float* aabb) {
+	const auto& min = CAABB_MIN(aabb);
+	const auto& max = CAABB_MAX(aabb);
+	float minD, maxD;
+	if (plane.x > 0.0f) {
+		minD = plane.x * min.x;
+		maxD = plane.x * max.x;
+	}
+	else {
+		minD = plane.x * max.x;
+		maxD = plane.x * min.x;
+	}
+
+	if (plane.y > 0.0f) {
+		minD += plane.y * min.y;
+		maxD += plane.y * max.y;
+	}
+	else {
+		minD += plane.y * max.y;
+		maxD += plane.y * min.y;
+	}
+
+	if (plane.z > 0.0f) {
+		minD += plane.z * min.z;
+		maxD += plane.z * max.z;
+	}
+	else {
+		minD += plane.z * max.z;
+		maxD += plane.z * min.z;
+	}
+
+	// in front of the plane
+	if (minD > -plane.w) {
+		return 1;
+	}
+
+	// in back of the plane
+	if (maxD < -plane.w) {
+		return -1;
+	}
+
+	// straddle of the plane
+	return 0;
+}
+
+
+int
+math3d_aabb_intersect_plane(struct lastack *LS, const float *aabb, const float plane[4]){
+	return plane_intersect(VEC(plane), aabb);
+}
+
 // plane [left, right, bottom, top, near, far]
 enum PlaneName{
 	PN_left = 0,
@@ -620,50 +690,6 @@ math3d_frustum_points(struct lastack *LS, const float m[16], float *points[8]){
 	}
 }
 
-
-static inline int
-plane_intersect(const glm::vec4 &plane, const float* aabb) {
-	const auto& min = CAABB_MIN(aabb);
-	const auto& max = CAABB_MAX(aabb);
-	float minD, maxD;	
-	if (plane.x > 0.0f){
-		minD = plane.x * min.x;
-		maxD = plane.x * max.x;
-	} else {
-		minD = plane.x * max.x;
-		maxD = plane.x * min.x;
-	}
-
-	if (plane.y > 0.0f){
-		minD += plane.y * min.y;
-		maxD += plane.y * max.y;
-	} else {
-		minD += plane.y * max.y;
-		maxD += plane.y * min.y;
-	}
-
-	if (plane.z > 0.0f){
-		minD += plane.z * min.z;
-		maxD += plane.z * max.z;
-	} else {
-		minD += plane.z * max.z;
-		maxD += plane.z * min.z;
-	}
-
-	// in front of the plane
-	if (minD > -plane.w){
-		return 1;
-	}
-
-	// in back of the plane
-	if (maxD < -plane.w){
-		return -1;
-	}
-
-	// straddle of the plane
-	return 0;
-}
-
 // frustum
 int 
 math3d_frustum_intersect_aabb(struct lastack *LS, const float* planes[6], const float *aabb){
@@ -720,4 +746,9 @@ math3d_frustum_max_radius(struct lastack *LS, const float *points[8], const floa
 
 void math3d_frustum_calc_near_far(struct lastack *LS, const float *planes[6], float nearfar[2]){
 
+}
+
+float
+math3d_point2plane(struct lastack *LS, const float pt[4], const float plane[4]){
+	return glm::dot(VEC3(pt), VEC3(plane)) + plane[4];
 }
