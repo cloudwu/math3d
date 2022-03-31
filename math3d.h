@@ -5,8 +5,7 @@
 #include <lua.h>
 
 struct boxstack {
-	struct lastack * LS;
-	const void * refmeta;
+	struct lastack *LS;	
 };
 
 struct refobject {
@@ -21,11 +20,5 @@ int math3d_homogeneous_depth();
 
 const float * math3d_from_lua(lua_State *L, struct lastack *LS, int index, int type);
 const float * math3d_from_lua_id(lua_State *L, struct lastack *LS, int index, int *type);
-
-static inline struct lastack *
-math3d_getLS(lua_State *L) {
-	struct boxstack *bs = lua_touserdata(L, lua_upvalueindex(1));
-	return bs->LS;
-}
 
 #endif

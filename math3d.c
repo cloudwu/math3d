@@ -26,27 +26,10 @@
 #define MAT_ORTHO 1
 
 static int g_default_homogeneous_depth = 0;
-static int g_origin_bottom_left = 0;
-
-static size_t
-getlen(lua_State *L, int index) {
-	lua_len(L, index);
-	if (lua_isinteger(L, -1)) {
-		size_t len = lua_tointeger(L, -1);
-		lua_pop(L, 1);
-		return len;
-	}
-	return luaL_error(L, "lua_len returns %s", lua_typename(L, lua_type(L, -1)));
-}
 
 int
 math3d_homogeneous_depth() {
 	return g_default_homogeneous_depth;
-}
-
-int
-math3d_origin_bottom_left(){
-	return g_origin_bottom_left;
 }
 
 static inline void *
@@ -68,7 +51,7 @@ LUAID(lua_State *L, int index) {
 
 static inline struct lastack *
 GETLS(lua_State *L) {
-	return math3d_getLS(L);
+	return (struct lastack *)lua_touserdata(L, lua_upvalueindex(1));
 }
 
 static void
@@ -89,22 +72,18 @@ boxstack_gc(lua_State *L) {
 	return 0;
 }
 
-static const void *
-refobj_meta(lua_State *L) {
-	struct boxstack *bs = lua_touserdata(L, lua_upvalueindex(1));
-	return bs->refmeta;
-}
-
 static int64_t
 get_id(lua_State *L, int index, int ltype) {
 	if (ltype == LUA_TLIGHTUSERDATA) {
 		return (int64_t)lua_touserdata(L, index);
-	} else if (lua_getmetatable(L, index) && lua_topointer(L, -1) == refobj_meta(L)) {
-		lua_pop(L, 1);	// pop metatable
+	} else if (ltype == LUA_TUSERDATA) {
+		if (lua_rawlen(L, index) != sizeof(struct refobject)) {
+			luaL_error(L, "Invalid ref userdata");
+		}
 		struct refobject * ref = lua_touserdata(L, index);
 		return ref->id;
 	}
-	return luaL_argerror(L, index, "Need ref userdata");
+	return luaL_argerror(L, index, "Need userdata");
 }
 
 static int
@@ -152,8 +131,8 @@ assign_id(lua_State *L, struct lastack *LS, int index, int mtype, int ltype) {
 }
 
 static void
-unpack_numbers(lua_State *L, int index, float *v, size_t n) {
-	size_t i;
+unpack_numbers(lua_State *L, int index, float *v, int n) {
+	int i;
 	for (i=0;i<n;i++) {
 		if (lua_geti(L, index, i+1) != LUA_TNUMBER) {
 			luaL_error(L, "Need a number from index %d", i+1);
@@ -167,12 +146,13 @@ typedef int64_t (*from_table_func)(lua_State *L, struct lastack *LS, int index);
 
 static int64_t
 vector_from_table(lua_State *L, struct lastack *LS, int index) {
-	size_t n = getlen(L, index);
+	int n = lua_rawlen(L, index);
 	if (n != 3 && n != 4)
 		return luaL_error(L, "Vector need a array of 3/4 (%d)", n);
-	float *v = lastack_allocvec4(LS);
+	float v[4];
 	v[3] = 1.0f;
 	unpack_numbers(L, index, v, n);
+	lastack_pushvec4(LS, v);
 	return lastack_pop(LS);
 }
 
@@ -232,7 +212,7 @@ quat_from_axis(lua_State *L, struct lastack *LS, int index, const char *key) {
 
 static int64_t
 quat_from_table(lua_State *L, struct lastack *LS, int index) {
-	size_t n = getlen(L, index);
+	int n = lua_rawlen(L, index);
 	if (n == 0) {
 		if (quat_from_axis(L, LS, index, "axis"))
 			return luaL_error(L, "Quat invalid arguments");
@@ -241,8 +221,9 @@ quat_from_table(lua_State *L, struct lastack *LS, int index) {
 		unpack_numbers(L, index, e, 3);
 		math3d_make_quat_from_euler(LS, e[0], e[1], e[2]);
 	} else if (n == 4) {
-		float *v = lastack_allocquat(LS);
+		float v[4];
 		unpack_numbers(L, index, v, 4);
+		lastack_pushquat(LS, v);
 	} else {
 		return luaL_error(L, "Quat need a array of 4 (quat) or 3 (eular), it's (%d)", n);
 	}
@@ -252,7 +233,7 @@ quat_from_table(lua_State *L, struct lastack *LS, int index) {
 
 static int64_t
 matrix_from_table(lua_State *L, struct lastack *LS, int index) {
-	size_t n = getlen(L, index);
+	int n = lua_rawlen(L, index);
 	if (n == 0) {
 		const float *s;
 		float tmp[4];
@@ -272,8 +253,9 @@ matrix_from_table(lua_State *L, struct lastack *LS, int index) {
 	} else if (n != 16) {
 		return luaL_error(L, "Matrix need a array of 16 (%d)", n);
 	} else {
-		float *v = lastack_allocmatrix(LS);
+		float v[16];
 		unpack_numbers(L, index, v, 16);
+		lastack_pushmatrix(LS, v);
 	}
 	return lastack_pop(LS);
 }
@@ -349,7 +331,7 @@ assign_rot(lua_State *L, struct lastack *LS, int index, int64_t oid) {
 
 static int64_t
 assign_trans(lua_State *L, struct lastack *LS, int index, int64_t oid) {
-	float *mat = lastack_allocmatrix(LS);
+	float mat[64];
 	copy_matrix(L, LS, oid, mat);
 	const float * t = object_from_index(L, LS, index, LINEAR_TYPE_VEC4, vector_from_table);
 	if (t == NULL) {
@@ -363,40 +345,20 @@ assign_trans(lua_State *L, struct lastack *LS, int index, int64_t oid) {
 		mat[3*4+2] = t[2];
 		mat[3*4+3] = 1;
 	}
+	lastack_pushmatrix(LS, mat);
 	return lastack_mark(LS, lastack_pop(LS));
 }
 
-static void
-set_index_object(lua_State *L, struct lastack *LS, int64_t id);
-
 static int
-ref_set_number(lua_State *L){
-	struct refobject *R = lua_touserdata(L, 1);
-	struct lastack *LS = GETLS(L);
-	const int64_t oid = R->id;
-
-	set_index_object(L, LS, oid);
-	R->id = lastack_mark(LS, lastack_pop(LS));
-	lastack_unmark(LS, oid);
-	return 0;
-}
-
-static int
-ref_set_key(lua_State *L){
+lref_setter(lua_State *L) {
 	struct refobject *R = lua_touserdata(L, 1);
 	const char *key = luaL_checkstring(L, 2);
 	struct lastack *LS = GETLS(L);
 	int64_t oid = R->id;
 	switch(key[0]) {
-	case 'i': { // value id
-		int64_t nid = get_id(L, 3, lua_type(L, 3));
-		if (nid != oid) {
-			R->id = lastack_mark(LS, nid);
-		} else {
-			// do not unmark oid
-			return 0;
-		}
-		break; }
+	case 'i':	// value id
+		R->id = lastack_mark(LS, get_id(L, 3, lua_type(L, 3)));
+		break;
 	case 'v':	// should be vector
 		R->id = assign_vector(L, LS, 3);
 		break;
@@ -418,25 +380,13 @@ ref_set_key(lua_State *L){
 	default:
 		return luaL_error(L, "Invalid set key %s with ref object", key); 
 	}
+	// we must unmark old id after assign, because 'v.i = v'
 	lastack_unmark(LS, oid);
 	return 0;
 }
 
-static int
-lref_setter(lua_State *L) {
-	int type = lua_type(L, 2);
-	switch (type) {
-	case LUA_TNUMBER:
-		return ref_set_number(L);
-	case LUA_TSTRING:
-		return ref_set_key(L);
-	default:
-		return luaL_error(L, "Invalid key type %s", lua_typename(L, type));
-	}
-}
-
 static void
-to_table(lua_State *L, struct lastack *LS, int64_t id, int needtype) {
+to_table(lua_State *L, struct lastack *LS, int64_t id) {
 	int type;
 	const float * v = lastack_value(LS, id, &type);
 	if (v == NULL) {
@@ -450,30 +400,28 @@ to_table(lua_State *L, struct lastack *LS, int64_t id, int needtype) {
 		lua_pushnumber(L, v[i]);
 		lua_rawseti(L, -2, i+1);
 	}
-	if (needtype){
-		lua_pushstring(L, lastack_typename(type));
-		lua_setfield(L, -2, "type");
-	}
+	lua_pushstring(L, lastack_typename(type));
+	lua_setfield(L, -2, "type");
 }
 
 static int64_t
 extract_srt(struct lastack *LS, const float *mat, int what) {
-	float *v;
+	float v[4];
 	switch(what) {
 	case 's':
-		v = lastack_allocvec4(LS);
 		math3d_decompose_scale(mat, v);
+		lastack_pushvec4(LS, v);
 		break;
 	case 'r':
-		v = lastack_allocquat(LS);
 		math3d_decompose_rot(mat, v);
+		lastack_pushquat(LS, v);
 		break;
 	case 't':
-		v = lastack_allocvec4(LS);
 		v[0] = mat[3*4+0];
 		v[1] = mat[3*4+1];
 		v[2] = mat[3*4+2];
 		v[3] = 1;
+		lastack_pushvec4(LS, v);
 		break;
 	default:
 		return 0;
@@ -494,7 +442,7 @@ ref_get_key(lua_State *L) {
 		lua_pushlightuserdata(L, (void *)(lastack_value(LS, R->id, NULL)));
 		break;
 	case 'v':
-		to_table(L, LS, R->id, 1);
+		to_table(L, LS, R->id);
 		break;
 	case 's':
 	case 'r':
@@ -550,6 +498,14 @@ ref_get_number(lua_State *L) {
 		return luaL_error(L, "Invalid ref object");
 	}
 	return index_object(L, LS, R->id, idx);
+}
+
+
+static int
+lindex(lua_State *L) {
+	int64_t id = get_id(L, 1, lua_type(L, 1));
+	int idx = luaL_checkinteger(L, 2);
+	return index_object(L, GETLS(L), id, idx);
 }
 
 
@@ -669,11 +625,43 @@ lreset(lua_State *L) {
 
 static const float *
 get_object(lua_State *L, struct lastack *LS, int index, int *type) {
-	int64_t id = get_id(L, index, lua_type(L, index));
+	int ltype = lua_type(L, index);
+	if (ltype == LUA_TNUMBER) {
+		float n[4] = { lua_tonumber(L, index),0,0,0 };
+		lastack_pushvec4(LS, n);
+		*type = LINEAR_TYPE_NUM;
+		return lastack_value(LS, lastack_pop(LS), NULL);
+	}
+	int64_t id = get_id(L, index, ltype);
 	const float * v = lastack_value(LS, id, type);
 	if (v == NULL)
 		luaL_error(L, "Invalid id at stack %d", index);
 	return v;
+}
+
+static int
+lmul(lua_State *L) {
+	int top = lua_gettop(L);
+	struct lastack *LS = GETLS(L);
+	int i;
+	float tmp[16];
+	int lt,rt;
+	if (top < 2) {
+		return luaL_error(L, "Need 2 or more objects");
+	}
+	const float *lv = get_object(L, LS, 1, &lt);
+	for (i=2;i<=top;i++) {
+		const float *rv = get_object(L, LS, i, &rt);
+		int result_type = math3d_mul_object(LS, lv, rv, lt, rt, tmp);
+		if (result_type == LINEAR_TYPE_NONE) {
+			return luaL_error(L, "Invalid mul arguments at %d, ltype = %d rtype = %d\nmatrix or quaternion mul vector should use 'transform' function", i, lt, rt);
+		}
+		lt = result_type;
+		lv = tmp;
+	}
+	lastack_pushobject(LS, tmp, lt);
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
+	return 1;
 }
 
 static const float *
@@ -684,80 +672,74 @@ vector_from_index(lua_State *L, struct lastack *LS, int index) {
 	return v;
 }
 
-static float *
-alloc_vec4(lua_State *L, struct lastack *LS) {
-	float * v = lastack_allocvec4(LS);
-	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
-	return v;
-}
-
 static int
 ladd(lua_State *L) {
 	struct lastack *LS = GETLS(L);
 	int i;
+	float tmp[4];
 	int top = lua_gettop(L);
 	if (top < 2) {
 		return luaL_error(L, "Need 2 or more vectors");
 	}
-	float *tmp = alloc_vec4(L, LS);
 	const float *lv = vector_from_index(L, LS, 1);
 	for (i=2;i<=top;i++) {
 		const float *rv = vector_from_index(L, LS, 2);
 		math3d_add_vec(LS, lv, rv, tmp);
 		lv = tmp;
 	}
+	lastack_pushvec4(LS, tmp);
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	return 1;
 }
 
 static int
 lsub(lua_State *L) {
 	struct lastack *LS = GETLS(L);
-	float *tmp = alloc_vec4(L, LS);
+	float tmp[4];
 	const float *v0 = vector_from_index(L, LS, 1);
 	const float *v1 = vector_from_index(L, LS, 2);
 	math3d_sub_vec(LS, v0, v1, tmp);
 
+	lastack_pushvec4(LS, tmp);
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	return 1;
-}
-
-
-
-static const float *
-get_vec_or_number(lua_State *L, struct lastack *LS, int index, float tmp[4]) {
-	if (lua_type(L, index) == LUA_TNUMBER) {
-		tmp[0] = lua_tonumber(L, index);
-		tmp[1] = tmp[0];
-		tmp[2] = tmp[0];
-		tmp[3] = tmp[0];
-		return tmp;
-	} else {
-		return vector_from_index(L, LS, index);
-	}
 }
 
 static int
-lmuladd(lua_State *L) {
+lmuladd(lua_State *L){
 	struct lastack *LS = GETLS(L);
-	float n1[4];
-	float n2[4];
-	const float *v0 = get_vec_or_number(L, LS, 1, n1);
-	const float *v1 = get_vec_or_number(L, LS, 2, n2);
-	const float *v2 = vector_from_index(L, LS, 3);
+	
+	int ltype, rtype;
+	const float *v0 = get_object(L, LS, 1, &ltype);
+	if (ltype != LINEAR_TYPE_NUM && ltype != LINEAR_TYPE_VEC4){
+		return luaL_error(L, "argument 1 must be number/vec4:%s", lastack_typename(ltype));
+	}
+	const float *v1 = get_object(L, LS, 2, &rtype);
+	if (rtype != LINEAR_TYPE_NUM && rtype != LINEAR_TYPE_VEC4){
+		return luaL_error(L, "argument 1 must be number/vec4:%s", lastack_typename(rtype));
+	}
 
-	float *result = lastack_allocvec4(LS);
-	void *result_id = STACKID(lastack_pop(LS));
-	math3d_mul_vec4(LS, v0, v1, result);
-	math3d_add_vec(LS, result, v2, result);
+	if ((ltype == LINEAR_TYPE_NUM && rtype == LINEAR_TYPE_VEC4) ||
+		(ltype == LINEAR_TYPE_VEC4 && rtype == LINEAR_TYPE_NUM) ||
+		(ltype == LINEAR_TYPE_VEC4 && rtype == LINEAR_TYPE_VEC4)){
+		float result[16];
+		math3d_mul_object(LS, v0, v1, ltype, rtype, result);
+		const float * v2 = vector_from_index(L, LS, 3);
 
-	lua_pushlightuserdata(L, result_id);
-	return 1;
+		math3d_add_vec(LS, result, v2, result);
+		lastack_pushvec4(LS, result);
+		lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
+		return 1;
+	}
+
+	return luaL_error(L, "argumen 1/2 must be one of them as vec4, argument 1:%s, argument 2:%s", lastack_typename(ltype), lastack_typename(rtype));
 }
 
 static const float *
 matrix_from_index(lua_State *L, struct lastack *LS, int index) {
 	const float * m = object_from_index(L, LS, index, LINEAR_TYPE_MAT, matrix_from_table);
 	if (m == NULL)
-		luaL_error(L, "Need a matrix");
+		luaL_error(L, "Need a vector");
 	return m;
 }
 
@@ -767,103 +749,6 @@ quat_from_index(lua_State *L, struct lastack *LS, int index) {
 	if (q == NULL)
 		luaL_error(L, "Need a quat");
 	return q;
-}
-
-static int
-lindex(lua_State *L) {
-	int64_t id = get_id(L, 1, lua_type(L, 1));
-	int idx = luaL_checkinteger(L, 2);
-	return index_object(L, GETLS(L), id, idx);
-}
-
-static void
-set_index_object(lua_State *L, struct lastack *LS, int64_t id){
-	int type;
-	const float * v = lastack_value(LS, id, &type);
-	if (v == NULL) {
-		luaL_error(L, "Invalid ref object");
-		return;
-	}
-
-	int idx = luaL_checkinteger(L, 2);
-	if (idx < 1 || idx > 4) {
-		luaL_error(L, "Invalid index %d", idx);
-		return;
-	}
-	--idx;
-
-	switch (type)
-	{
-	case LINEAR_TYPE_MAT:{
-		const float* nv = vector_from_index(L, LS, 3);
-		float vv[16]; memcpy(vv, v, sizeof(vv));
-		memcpy(vv + idx * 4, nv, sizeof(float) * 4);
-		lastack_pushmatrix(LS, vv);
-	}
-		break;
-	case LINEAR_TYPE_VEC4:
-	case LINEAR_TYPE_QUAT:{
-		float vv[4]; memcpy(vv, v, sizeof(vv));
-		vv[idx] = luaL_checknumber(L, 3);
-		lastack_pushvec4(LS, vv);
-	}
-		break;
-	default:
-		luaL_error(L, "invalid data type:%s", lastack_typename(type));
-	}
-}
-
-
-static int
-lset_index(lua_State *L){
-	struct lastack *LS  = GETLS(L);
-	int64_t id = get_id(L, 1, lua_type(L, 1));
-
-	set_index_object(L, LS, id);
-	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
-	return 1;
-}
-
-static int
-lmul(lua_State *L) {
-	struct lastack *LS = GETLS(L);
-	if (lua_isnumber(L, 1)) {
-		// number * vertex
-		float r[4];
-		r[0] = lua_tonumber(L, 1);
-		r[1] = r[0];
-		r[2] = r[0];
-		r[3] = r[0];
-		math3d_mul_vec4(LS, r, vector_from_index(L, LS, 2), lastack_allocvec4(LS));
-	} else {
-		int type;
-		const float *lv = get_object(L, LS, 1, &type);
-		switch (type) {
-		case LINEAR_TYPE_MAT:
-			math3d_mul_matrix(LS, lv, matrix_from_index(L, LS, 2), lastack_allocmatrix(LS));
-			break;
-		case LINEAR_TYPE_QUAT:
-			math3d_mul_quat(LS, lv, quat_from_index(L, LS, 2), lastack_allocquat(LS));
-			break;
-		case LINEAR_TYPE_VEC4:
-			if (lua_isnumber(L, 2)) {
-				float r[4];
-				r[0] = lua_tonumber(L, 2);
-				r[1] = r[0];
-				r[2] = r[0];
-				r[3] = r[0];
-				math3d_mul_vec4(LS, lv, r, lastack_allocvec4(LS));
-			} else {
-				math3d_mul_vec4(LS, lv, vector_from_index(L, LS, 2), lastack_allocvec4(LS));
-			}
-			break;
-		default:
-			return luaL_error(L, "Invalid mul arguments %s or quaternion mul vector should use 'transform' function", lastack_typename(type));
-		}
-	}
-
-	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
-	return 1;
 }
 
 static int64_t
@@ -922,11 +807,9 @@ lvector(lua_State *L) {
 		if (n4 == vec3[3]) {
 			lua_pushlightuserdata(L, STACKID(id));
 		} else {
-			float *vec4 = alloc_vec4(L, LS);
-			vec4[0] = vec3[0];
-			vec4[1] = vec3[1];
-			vec4[2] = vec3[2];
-			vec4[3] = n4;
+			float vec4 [4] = { vec3[0], vec3[1], vec3[2], n4 };
+			lastack_pushvec4(LS, vec4);
+			lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 		}
 		return 1;
 	}
@@ -946,11 +829,7 @@ lquaternion(lua_State *L) {
 static int
 lsrt(lua_State *L) {
 	struct lastack *LS = GETLS(L);
-	int type;
-	const float *mat = get_object(L, LS, 1, &type);
-	if (type != LINEAR_TYPE_MAT || mat == NULL){
-		luaL_error(L, "invalid type:%s", lastack_typename(type));
-	}
+	const float * mat = matrix_from_index(L, LS, 1);
 	math3d_decompose_matrix(LS, mat);
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
@@ -1038,11 +917,8 @@ linverse(lua_State *L) {
 	const float *v = get_object(L, LS, 1, &type);
 	switch (type) {
 	case LINEAR_TYPE_VEC4: {
-		float *iv = lastack_allocvec4(LS);
-		iv[0] = -v[0];
-		iv[1] = -v[1];
-		iv[2] = -v[2];
-		iv[3] = v[3];
+		float iv[4] = { -v[0], -v[1], -v[2], v[3] };
+		lastack_pushvec4(LS, iv);
 		break; }
 	case LINEAR_TYPE_QUAT:
 		math3d_inverse_quat(LS, v);
@@ -1053,16 +929,6 @@ linverse(lua_State *L) {
 	default:
 		return luaL_error(L, "inverse don't support %s", lastack_typename(type));
 	}
-	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
-	return 1;
-}
-
-static int
-linverse_fast(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float * mat = matrix_from_index(L, LS, 1);
-	math3d_inverse_matrix_fast(LS, mat);
-
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	return 1;
 }
@@ -1133,15 +999,7 @@ static int
 ltotable(lua_State *L){
 	struct lastack *LS = GETLS(L);
 	int64_t id = get_id(L, 1, lua_type(L, 1));
-	to_table(L, LS, id, 1);
-	return 1;
-}
-
-static int
-ltovalue(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	int64_t id = get_id(L, 1, lua_type(L, 1));
-	to_table(L, LS, id, 0);
+	to_table(L, LS, id);
 	return 1;
 }
 
@@ -1279,31 +1137,23 @@ lminmax(lua_State *L){
 	struct lastack *LS = GETLS(L);
 
 	luaL_checktype(L, 1, LUA_TTABLE);
-	const int numpoints = (int)getlen(L, 1);
+	const int numpoints = (int)lua_rawlen(L, 1);
 
 	const float* transform = lua_isnoneornil(L, 2) ? NULL : matrix_from_index(L, LS, 2);
-
-	lastack_preallocfloat4(LS, 2);
-
-	float *minv = alloc_vec4(L, LS);
-	minv[0] = FLT_MAX;
-	minv[1] = FLT_MAX;
-	minv[2] = FLT_MAX;
-	minv[3] = FLT_MAX;
-
-	float *maxv = alloc_vec4(L, LS);
-	maxv[0] = -FLT_MAX;
-	maxv[1] = -FLT_MAX;
-	maxv[2] = -FLT_MAX;
-	maxv[3] = -FLT_MAX;
-
+	float minv[4] = {FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX};
+	float maxv[4] = {-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX};
 	for (int ii = 0; ii < numpoints; ++ii){
+		float v[4];
 		lua_geti(L, 1, ii+1);
-		const float *v = vector_from_index(L, LS, -1);
+		unpack_numbers(L, -1, v, 4);
 		lua_pop(L, 1);
 		math3d_minmax(LS, transform, v, minv, maxv);
 	}
 
+	lastack_pushvec4(LS, minv);
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
+	lastack_pushvec4(LS, maxv);
+	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	return 2;
 }
 
@@ -1315,18 +1165,10 @@ llerp(lua_State *L){
 
 	const float ratio = luaL_checknumber(L, 3);
 
-	float *r = alloc_vec4(L, LS);
-
+	float r[4];
 	math3d_lerp(LS, v0, v1, ratio, r);
-	return 1;
-}
-
-static int
-lmatrix_scale(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *m = matrix_from_index(L, LS, 1);
-	float *scale = lastack_allocvec4(LS);
-	math3d_decompose_scale(m, scale);
+	
+	lastack_pushvec4(LS, r);
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	return 1;
 }
@@ -1339,15 +1181,15 @@ lstacksize(lua_State *L) {
 }
 
 static int
-lset_homogeneous_depth(lua_State *L){
-	g_default_homogeneous_depth = lua_toboolean(L, 1) ? 1 : 0;
-	return 0;
-}
+lhomogeneous_depth(lua_State *L){
+	int num = lua_gettop(L);
+	if (num > 0){
+		g_default_homogeneous_depth = lua_toboolean(L, 1) != 0;	
+		return 0;
+	}
 
-static int
-lset_origin_bottom_left(lua_State *L){
-	g_origin_bottom_left = lua_toboolean(L, 1) ? 1 : 0;
-	return 0;
+	lua_pushboolean(L, g_default_homogeneous_depth ? 1 : 0);
+	return 1;
 }
 
 static int
@@ -1389,27 +1231,6 @@ lpack(lua_State *L) {
 	return 1;
 }
 
-static int
-lisvalid(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	int type;
-	int64_t id = get_id(L, 1, lua_type(L, 1));
-	const float * v = lastack_value(LS, id, &type);
-	lua_pushboolean(L, v != NULL);
-	return 1;
-}
-
-static int
-lquat2euler(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *q = quat_from_index(L, LS, 1);
-	float *euler = alloc_vec4(L, LS);
-
-	math3d_quat_to_euler(LS, q, euler);
-
-	return 1;
-}
-
 // input: view direction vector
 // output: 
 //		output radianX and radianY which can used to create quaternion that around x-axis and y-axis, 
@@ -1425,314 +1246,22 @@ ldir2radian(lua_State *L){
 	return 2;
 }
 
-static int
-lforward_dir(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *mat = matrix_from_index(L, LS, 1);
-	const float v[4] = {0, 0, 1, 0};
-	math3d_rotmat_transform(LS, mat, v);
-	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
-	return 1;
-}
+LUAMOD_API int
+luaopen_math3d(lua_State *L) {
+	luaL_checkversion(L);
 
-static inline void
-init_aabb(float *aabb, const float *oriaabb){
-	if (oriaabb){
-		memcpy(aabb, oriaabb, sizeof(float) * 8);	// matrix col0 and col1 is min and max value
-	} else {
-		memset(aabb, 0, sizeof(float) * 16);
-		for (int ii = 0; ii < 3; ++ii){
-			aabb[ii] = FLT_MAX;
-			aabb[ii+4] = -FLT_MAX;
-		}
-	}
-}
+	struct boxstack * bs = lua_newuserdatauv(L, sizeof(struct boxstack), 0);
+	bs->LS = lastack_new();
+	finalize(L, boxstack_gc);
+	lua_setfield(L, LUA_REGISTRYINDEX, MATH3D_STACK);
 
-static inline float *
-alloc_aabb(lua_State *L, struct lastack *LS) {
-	float *aabb = lastack_allocmatrix(LS);
-	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
-	return aabb;
-}
-
-static inline int
-generate_aabb(lua_State *L, struct lastack *LS, const float *oriaabb){
-	const int num = lua_gettop(L);
-	float *aabb = alloc_aabb(L, LS);
-	init_aabb(aabb, oriaabb);
-
-	for (int ii = 0; ii < num; ++ii){
-		const float *v = vector_from_index(L, LS, ii+1);
-		math3d_aabb_append(LS, v, aabb);
-	}
-
-	return 1;
-}
-
-static int
-laabb(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	generate_aabb(L, LS, NULL);
-	return 1;
-}
-
-static int
-laabb_isvalid(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	lua_pushboolean(L, math3d_aabb_isvalid(LS, matrix_from_index(L, LS, 1)));
-	return 1;
-}
-
-static int
-laabb_append(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *aabb = matrix_from_index(L, LS, 1);
-	lua_remove(L, 1);
-	generate_aabb(L, LS, aabb);
-	return 1;
-}
-
-static int
-laabb_merge(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *lhsaabb = matrix_from_index(L, LS, 1);
-	const float *rhsaabb = matrix_from_index(L, LS, 1);
-	float *aabb = alloc_aabb(L, LS);
-	math3d_aabb_merge(LS, lhsaabb, rhsaabb, aabb);
-
-	return 1;
-}
-
-// 1 : worldmat
-// 2 : aabb (can be nil)
-// 3 : srtmat (can be nil)
-// return 1: aabb (nil if input aabb is nil)
-// return 2: worldmat
-static int
-laabb_transform(lua_State *L) {
-	struct lastack *LS = GETLS(L);
-	const float * worldmat = matrix_from_index(L, LS, 1);
-	const float * aabb = object_from_index(L, LS, 2, LINEAR_TYPE_MAT, matrix_from_table);
-	const float * srt = object_from_index(L, LS, 3, LINEAR_TYPE_MAT, matrix_from_table);
-	if (srt == NULL && aabb == NULL) {
-		lua_pushnil(L);
-		lua_pushvalue(L, 1);
-		return 2;	// returns nil, worldmat
-	}
-	void * result_matid = NULL;
-	if (srt) {
-		float *mat = lastack_allocmatrix(LS);
-		result_matid = STACKID(lastack_pop(LS));
-		math3d_mul_matrix(LS, worldmat, srt, mat);
-		worldmat = mat;
-	}
-	if (aabb) {
-		float *aabb_result = lastack_allocmatrix(LS);
-		lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
-
-		math3d_aabb_transform(LS, worldmat, aabb, aabb_result);
-	} else {
-		lua_pushnil(L);
-	}
-	if (result_matid) {
-		lua_pushlightuserdata(L, result_matid);
-	} else {
-		lua_pushvalue(L, 1);
-	}
-	return 2;
-}
-
-static int
-laabb_center_extents(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *aabb = matrix_from_index(L, LS, 1);
-	lastack_preallocfloat4(LS, 2);
-	float *center = alloc_vec4(L, LS);
-	float *extents= alloc_vec4(L, LS);
-	math3d_aabb_center_extents(LS, aabb, center, extents);
-
-	return 2;
-}
-
-static int
-laabb_intersect_plane(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *aabb = matrix_from_index(L, LS, 1);
-	const float *plane = vector_from_index(L, LS, 2);
-
-	lua_pushinteger(L, math3d_aabb_intersect_plane(LS, aabb, plane));
-	return 1;
-}
-
-//frustum
-static int
-lfrustum_planes(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *m = matrix_from_index(L, LS, 1);
-	float *planes[6];
-	int i;
-	lua_createtable(L, 6, 0);
-	lastack_preallocfloat4(LS, 6);
-	for (i=0;i<6;i++) {
-		planes[i] = alloc_vec4(L, LS);
-		lua_seti(L, -2, i+1);
-	}
-	math3d_frustum_planes(LS, m, planes);
-
-	return 1;
-}
-
-static inline void
-fetch_vectors_from_table(lua_State *L, struct lastack *LS, int index, int checknum, const float** vectors){
-	const size_t num = getlen(L, index);
-	if (num != checknum){
-		luaL_error(L, "table need contain %d planes:%d", checknum, num);
-	}
-	for (int ii = 0; ii < num; ++ii){
-		lua_geti(L, index, ii+1);
-		vectors[ii] = vector_from_index(L, LS, -1);
-		lua_pop(L, 1);
-	}
-}
-
-static inline void
-fetch_frustum_planes(lua_State *L, struct lastack *LS, int index, const float* planes[6]){
-	fetch_vectors_from_table(L, LS, index, 6, planes);
-}
-
-static inline void
-fetch_frustum_points(lua_State *L, struct lastack *LS, int index, const float *points[8]){
-	fetch_vectors_from_table(L, LS, index, 8, points);
-}
-
-static int
-lfrustum_intersect_aabb(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	luaL_checktype(L, 1, LUA_TTABLE);
-	const float* planes[6];
-	fetch_frustum_planes(L, LS, 1, planes);
-
-	const float* aabb = matrix_from_index(L, LS, 2);
-	lua_pushinteger(L, math3d_frustum_intersect_aabb(LS, planes, aabb));
-	return 1;
-}
-
-static int
-lfrustum_intersect_aabb_list(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float* planes[6];
-	fetch_frustum_planes(L, LS, 1, planes);
-
-	const int resultidx = lua_gettop(L)+1;
-	lua_newtable(L);
-
-	int haselem = 0;
-	lua_pushnil(L);
-	while (lua_next(L, 2) != 0){
-		//	table: eid=value
-		//		value: {aabb=...}
-		const lua_Integer eid = lua_tointeger(L, -2);	//table key
-
-		const float * aabb = (LUA_TNIL != lua_getfield(L, -1, "aabb")) ?
-			object_from_index(L, LS, -1, LINEAR_TYPE_MAT, matrix_from_table) : NULL;
-		lua_pop(L, 1);
-
-		if (aabb == NULL || math3d_frustum_intersect_aabb(LS, planes, aabb) >= 0){
-			lua_pushvalue(L, -1);	//-1 is table value
-			lua_seti(L, resultidx, eid);
-			haselem = 1;
-		}
-
-		lua_pop(L, 1);
-	}
-
-	return haselem;
-}
-
-static int
-lfrustum_points(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *m = matrix_from_index(L, LS, 1);
-
-	lua_createtable(L, 8, 0);
-	float *points[8];
-	int i;
-	lastack_preallocfloat4(LS, 8);
-	for (i=0;i<8;i++) {
-		points[i] = alloc_vec4(L, LS);
-		lua_seti(L, -2, i+1);
-	}
-	math3d_frustum_points(LS, m, points);
-	return 1;
-}
-
-static int
-lfrustum_aabb(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *points[8];
-	fetch_frustum_points(L, LS, 1, points);
-
-	float *aabb = alloc_aabb(L, LS);
-	math3d_frusutm_aabb(LS, points, aabb);
-
-	return 1;
-}
-
-static int
-lfrustum_center(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *points[8];
-	fetch_frustum_points(L, LS, 1, points);
-	float *center = alloc_vec4(L, LS);
-	math3d_frustum_center(LS, points, center);
-
-	return 1;
-}
-
-static int
-lfrustum_max_radius(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *points[8];
-	fetch_frustum_points(L, LS, 1, points);
-
-	const float *center = vector_from_index(L, LS, 2);
-	lua_pushnumber(L, math3d_frustum_max_radius(LS, points, center));
-	return 1;
-}
-
-static int
-lfrustum_calc_near_far(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float* planes[6];
-	fetch_frustum_planes(L, LS, 1, planes);
-
-	float nearfar[2];
-	math3d_frustum_calc_near_far(LS, planes, nearfar);
-	lua_pushnumber(L, nearfar[0]);
-	lua_pushnumber(L, nearfar[1]);
-	return 2;
-}
-
-static int
-lpoint2plane(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *pt = vector_from_index(L, LS, 1);
-	const float *plane = vector_from_index(L, LS, 2);
-
-	lua_pushnumber(L, math3d_point2plane(LS, pt, plane));
-	return 1;
-}
-
-static void
-init_math3d_api(lua_State *L, struct boxstack *bs) {
-		luaL_Reg l[] = {
+	luaL_Reg l[] = {
 		{ "ref", NULL },
 		{ "tostring", ltostring },
 		{ "matrix", lmatrix },
 		{ "vector", lvector },
 		{ "quaternion", lquaternion },
 		{ "index", lindex },
-		{ "set_index", lset_index},
 		{ "reset", lreset },
 		{ "mul", lmul },
 		{ "add", ladd },
@@ -1747,62 +1276,28 @@ init_math3d_api(lua_State *L, struct boxstack *bs) {
 		{ "normalize", lnormalize },
 		{ "transpose", ltranspose },
 		{ "inverse", linverse },
-		{ "inverse_fast", linverse_fast},
 		{ "lookat", llookat },
 		{ "lookto", llookto },
 		{ "reciprocal", lreciprocal },
 		{ "todirection", ltodirection },
 		{ "torotation", ltorotation },
 		{ "totable", ltotable},
-		{ "tovalue", ltovalue},
 		{ "base_axes", lbase_axes},
 		{ "transform", ltransform},
 		{ "transformH", ltransform_homogeneous_point },
 		{ "projmat", lprojmat },
 		{ "minmax", lminmax},
 		{ "lerp", llerp},
-		{ "matrix_scale", lmatrix_scale},
-		{ "quat2euler", lquat2euler},
 		{ "dir2radian", ldir2radian},
-		{ "forward_dir",lforward_dir},
 		{ "stacksize", lstacksize},
-		{ "set_homogeneous_depth", lset_homogeneous_depth},
-		{ "set_origin_bottom_left", lset_origin_bottom_left},
+		{ "homogeneous_depth", lhomogeneous_depth },
 		{ "pack", lpack },
-		{ "isvalid", lisvalid},
-
-		//aabb
-		{ "aabb", laabb},
-		{ "aabb_isvalid", laabb_isvalid},
-		{ "aabb_append", laabb_append},
-		{ "aabb_merge", laabb_merge},
-		{ "aabb_transform", laabb_transform},
-		{ "aabb_center_extents", laabb_center_extents},
-		{ "aabb_intersect_plane", laabb_intersect_plane},
-
-		//frustum
-		{ "frustum_planes", 		lfrustum_planes},
-		{ "frustum_intersect_aabb", lfrustum_intersect_aabb},
-		{ "frustum_intersect_aabb_list", lfrustum_intersect_aabb_list},
-		{ "frustum_points", 		lfrustum_points},
-		{ "frustum_aabb",			lfrustum_aabb},
-		{ "frustum_center",			lfrustum_center},
-		{ "frustum_max_radius",		lfrustum_max_radius},
-		{ "frustum_calc_near_far",  lfrustum_calc_near_far},
-
-		//primitive
-		{ "point2plane",	lpoint2plane},
 		{ NULL, NULL },
 	};
 
 	luaL_newlibtable(L,l);
-	lua_pushlightuserdata(L, bs);
+	lua_pushlightuserdata(L, bs->LS);
 	luaL_setfuncs(L,l,1);
-}
-
-LUAMOD_API int
-luaopen_math3d(lua_State *L) {
-	luaL_checkversion(L);
 
 	luaL_Reg ref_mt[] = {
 		{ "__newindex", lref_setter },
@@ -1811,23 +1306,12 @@ luaopen_math3d(lua_State *L) {
 		{ "__gc", lref_gc },
 		{ NULL, NULL },
 	};
+
+	lua_pushlightuserdata(L, bs->LS);
+
 	luaL_newlibtable(L,ref_mt);
-	int refmeta = lua_gettop(L);
-
-	struct boxstack * bs = lua_newuserdatauv(L, sizeof(struct boxstack), 0);
-	bs->LS = lastack_new();
-	bs->refmeta = lua_topointer(L, refmeta);
-	finalize(L, boxstack_gc);
-	lua_setfield(L, LUA_REGISTRYINDEX, MATH3D_STACK);
-
-	init_math3d_api(L, bs);
-
-	lua_pushlightuserdata(L, bs);	// upvalue 1 of .ref
-
-	// init reobject meta table, it's upvalue 2 of .ref
-	lua_pushvalue(L, refmeta);
-	lua_pushlightuserdata(L, bs);
-	luaL_setfuncs(L,ref_mt, 1);
+	lua_pushlightuserdata(L, bs->LS);
+	luaL_setfuncs(L,ref_mt,1);
 
 	lua_pushcclosure(L, lref, 2);
 	lua_setfield(L, -2, "ref");
