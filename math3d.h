@@ -10,7 +10,7 @@ struct math3d_api {
 	const float * (*from_lua)(lua_State *L, struct lastack *LS, int index, int type);
 	const float * (*from_lua_id)(lua_State *L, struct lastack *LS, int index, int *type);
 	void (*push)(lua_State *L, struct lastack *LS, const float *v, int type);
-	int64_t (*mark_id)(lua_State *L, struct lastack *LS, int idx, int64_t oldv);
+	int64_t (*mark_id)(lua_State *L, struct lastack *LS, int idx);
 	void (*unmark_id)(struct lastack *LS, int64_t id);
 };
 
@@ -34,8 +34,8 @@ math3d_push(lua_State *L, struct math3d_api *S, const float *v, int type) {
 }
 
 static inline int64_t
-math3d_mark_id(lua_State *L, struct math3d_api *S, int idx, int64_t oldv) {
-	return S->mark_id(L, S->LS, idx, oldv);
+math3d_mark_id(lua_State *L, struct math3d_api *S, int idx) {
+	return S->mark_id(L, S->LS, idx);
 }
 
 static inline void

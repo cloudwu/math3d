@@ -2161,10 +2161,8 @@ math3d_push_(lua_State *L, struct lastack *LS, const float *v, int type) {
 }
 
 static int64_t
-math3d_mark_id_(lua_State *L, struct lastack *LS, int idx, int64_t oldv) {
+math3d_mark_id_(lua_State *L, struct lastack *LS, int idx) {
 	int64_t id = get_id(L, idx, lua_type(L, idx));
-	if (id == oldv)
-		return oldv;
 	return lastack_mark(LS, id);
 }
 
