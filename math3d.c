@@ -2171,6 +2171,11 @@ math3d_unmark_id_(struct lastack *LS, int64_t id) {
 	lastack_unmark(LS, id);
 }
 
+static const float *
+math3d_value_(struct lastack *LS, int64_t id) {
+	return lastack_value(LS, id, NULL);
+}
+
 LUAMOD_API int
 luaopen_math3d(lua_State *L) {
 	luaL_checkversion(L);
@@ -2192,8 +2197,9 @@ luaopen_math3d(lua_State *L) {
 	bs->from_lua_id = math3d_from_lua_id_;
 	bs->mark_id = math3d_mark_id_;
 	bs->unmark_id = math3d_unmark_id_;
-
 	bs->push = math3d_push_;
+	bs->value = math3d_value_;
+
 	finalize(L, boxstack_gc);
 	lua_setfield(L, LUA_REGISTRYINDEX, MATH3D_STACK);
 
