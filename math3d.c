@@ -2172,8 +2172,8 @@ math3d_unmark_id_(struct lastack *LS, int64_t id) {
 }
 
 static const float *
-math3d_value_(struct lastack *LS, int64_t id) {
-	return lastack_value(LS, id, NULL);
+math3d_value_(struct lastack *LS, int64_t id, int *type) {
+	return lastack_value(LS, id, type);
 }
 
 LUAMOD_API int

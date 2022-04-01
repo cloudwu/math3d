@@ -9,7 +9,7 @@ struct math3d_api {
 	const void * refmeta;
 	const float * (*from_lua)(lua_State *L, struct lastack *LS, int index, int type);
 	const float * (*from_lua_id)(lua_State *L, struct lastack *LS, int index, int *type);
-	const float * (*value)(struct lastack *LS, int64_t id);
+	const float * (*value)(struct lastack *LS, int64_t id, int *type);
 	void (*push)(lua_State *L, struct lastack *LS, const float *v, int type);
 	int64_t (*mark_id)(lua_State *L, struct lastack *LS, int idx);
 	void (*unmark_id)(struct lastack *LS, int64_t id);
@@ -45,8 +45,8 @@ math3d_unmark_id(struct math3d_api *S, int64_t id) {
 }
 
 static inline const float *
-math3d_value(struct math3d_api *S, int64_t id) {
-	return S->value(S->LS, id);
+math3d_value(struct math3d_api *S, int64_t id, int *type) {
+	return S->value(S->LS, id, type);
 }
 
 #endif
