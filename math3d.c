@@ -3,6 +3,7 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <math.h>
+#include <string.h>
 #include <float.h>
 
 #ifndef _MSC_VER
@@ -623,8 +624,8 @@ lref_gc(lua_State *L) {
 	return 0;
 }
 
-static int
-new_object(lua_State *L, int type, from_table_func from_table, int narray) { 
+static int64_t
+new_object_(lua_State *L, int type, from_table_func from_table, int narray) {
 	int argn = lua_gettop(L);
 	int64_t id;
 	if (argn == narray) {
@@ -657,6 +658,12 @@ new_object(lua_State *L, int type, from_table_func from_table, int narray) {
 			return luaL_error(L, "Invalid %s argument number %d", lastack_typename(type), argn);
 		}
 	}
+	return id;
+}
+
+static int
+new_object(lua_State *L, int type, from_table_func from_table, int narray) {
+	int64_t id = new_object_(L, type, from_table, narray);
 	lua_pushlightuserdata(L, STACKID(id));
 	return 1;
 }
@@ -2029,10 +2036,47 @@ lvalue_ptr(lua_State *L){
 	return 1;
 }
 
+static int
+lconstant(lua_State *L) {
+	luaL_checktype(L, 1, LUA_TTABLE);
+	if (lua_getfield(L, 1, "type") != LUA_TSTRING)
+		return luaL_error(L, "Need .type");
+	const char *tname = lua_tostring(L, -1);
+	int i;
+	for (i=0;i<LINEAR_TYPE_COUNT;i++) {
+		if (strcmp(tname, lastack_typename(i)) == 0)
+			break;
+	}
+	if (i == LINEAR_TYPE_COUNT) {
+		return luaL_error(L, "Unknown type %s", tname);
+	}
+	lua_pop(L, 1);
+	if (lua_rawlen(L, 1) == 0) {
+		lua_pushlightuserdata(L, STACKID(lastack_constant(i)));
+		return 1;
+	}
+	int64_t id = 0;
+
+	switch (i) {
+	case LINEAR_TYPE_MAT:
+		id = new_object_(L, LINEAR_TYPE_MAT, matrix_from_table, 16);
+		break;
+	case LINEAR_TYPE_VEC4:
+		id = new_object_(L, LINEAR_TYPE_VEC4, vector_from_table, 4);
+		break;
+	case LINEAR_TYPE_QUAT:
+		id = new_object_(L, LINEAR_TYPE_QUAT, quat_from_table, 4);
+		break;
+	}
+	lua_pushlightuserdata(L, STACKID(lastack_mark(GETLS(L), id)));
+	return 1;
+}
+
 static void
 init_math3d_api(lua_State *L, struct math3d_api *bs) {
 		luaL_Reg l[] = {
 		{ "ref", NULL },
+		{ "constant", lconstant },
 		{ "tostring", ltostring },
 		{ "matrix", lmatrix },
 		{ "vector", lvector },
