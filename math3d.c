@@ -621,9 +621,6 @@ id_tostring(lua_State *L, int64_t id) {
 		lua_pushfstring(L, "QUAT (%f,%f,%f,%f)",
 			v[0], v[1], v[2], v[3]);
 		break;
-	case LINEAR_TYPE_NULL:
-		lua_pushstring(L, "NULL");
-		break;
 	default:
 		lua_pushstring(L, "Unknown");
 		break;
