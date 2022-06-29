@@ -12,6 +12,7 @@
 
 // Constant: version should be 0, id is the constant id, persistent should be 1
 
+static float c_ident_null[4] = { 0,0,0,0 };
 static float c_ident_vec[4] = { 0,0,0,1 };
 static float c_ident_mat[16] = {
 	1,0,0,0,
@@ -33,6 +34,7 @@ static struct constant c_constant_table[LINEAR_TYPE_COUNT] = {
 	{ c_ident_mat, MATRIX },
 	{ c_ident_vec, VECTOR4 },	
 	{ c_ident_quat, VECTOR4 },
+	{ c_ident_null, VECTOR4 },
 };
 
 struct stackid_ {
@@ -339,6 +341,7 @@ lastack_typename(int t) {
 		"mat",
 		"v4",
 		"quat",
+		"null",
 	};
 	if (t < 0 || t >= sizeof(type_names)/sizeof(type_names[0]))
 		return "unknown";
