@@ -137,6 +137,22 @@ lref(lua_State *L) {
 	return 1;
 }
 
+static int
+lmark(lua_State *L) {
+	int64_t id = get_id(L, 1, lua_type(L, 1));
+	id = lastack_mark(GETLS(L), id);
+	lua_pushlightuserdata(L, STACKID(id));
+	return 1;
+}
+
+static int
+lunmark(lua_State *L) {
+	luaL_checktype(L, 1, LUA_TLIGHTUSERDATA);
+	int64_t id = (int64_t)lua_touserdata(L, 1);
+	lastack_unmark(GETLS(L), id);
+	return 0;
+}
+
 static int64_t
 assign_id(lua_State *L, struct lastack *LS, int index, int mtype, int ltype) {
 	switch (ltype) {
@@ -1328,63 +1344,55 @@ ltransform_homogeneous_point(lua_State *L) {
 	return 1;
 }
 
-static void
-create_proj_mat(lua_State *L, struct lastack *LS, int index) {
-	float left, right, top, bottom;
-	lua_getfield(L, index, "n");
-	float near = (float)luaL_optnumber(L, -1, 0.1f);
+static inline float
+read_number(lua_State *L, int index, const char* n, float opt){
+	lua_getfield(L, index, n);
+	const float num = (float)luaL_optnumber(L, -1, opt);
 	lua_pop(L, 1);
-	lua_getfield(L, index, "f");
-	float far = (float)luaL_optnumber(L, -1, 100.0f);
-	lua_pop(L, 1);
+	return num;
+}
 
-	int mattype = MAT_PERSPECTIVE;
+static void
+create_proj_mat(lua_State *L, struct lastack *LS, int index, int inv_z) {
+	const char* nn, *ff;
+	if (inv_z) {nn="f"; ff="n";}
+	else { nn="n"; ff="f";}
+
+	const float near = read_number(L, index, nn, 0.1f);
+	const float far = read_number(L, index, ff, 100.f);
+
 	if (lua_getfield(L, index, "fov") == LUA_TNUMBER) {
 		float fov = (float)lua_tonumber(L, -1);
 		lua_pop(L, 1);
-		lua_getfield(L, index, "aspect");
-		float aspect = (float)luaL_checknumber(L, -1);
-		lua_pop(L, 1);
-		float ymax = near * tanf(fov * ((float)M_PI / 360));
-		float xmax = ymax * aspect;
-		left = -xmax;
-		right = xmax;
-		bottom = -ymax;
-		top = ymax;
+
+		fov *= (float)M_PI / 180.f;
+
+		const float aspect = read_number(L, index, "aspect", 1.f);
+		math3d_perspectiveLH(LS, fov, aspect, near, far, g_default_homogeneous_depth);
 	} else {
 		lua_pop(L, 1); //pop "fov"
+
+		const float left = read_number(L, index, "l", -1.f);
+		const float right = read_number(L, index, "r", 1.f);
+
+		const float top = read_number(L, index, "t", 1.f);
+		const float bottom = read_number(L, index, "b", -1.f);
+
 		lua_getfield(L, index, "ortho");
-		if (lua_toboolean(L, -1)) {
-			mattype = MAT_ORTHO;
-		}
+		if (lua_toboolean(L, -1))
+			math3d_orthoLH(LS, left, right, bottom, top, near, far, g_default_homogeneous_depth);
+		else
+			math3d_frustumLH(LS, left, right, bottom, top, near, far, g_default_homogeneous_depth);
 		lua_pop(L, 1); //pop "ortho"
-		lua_getfield(L, index, "l");
-		left = (float)luaL_checknumber(L, -1);
-		lua_pop(L, 1);
-		lua_getfield(L, index, "r");
-		right = (float)luaL_checknumber(L, -1);
-		lua_pop(L, 1);
-		lua_getfield(L, index, "b");
-		bottom = (float)luaL_checknumber(L, -1);
-		lua_pop(L, 1);
-		lua_getfield(L, index, "t");
-		top = (float)luaL_checknumber(L, -1);
-		lua_pop(L, 1);
 	}
-
-	if (mattype == MAT_PERSPECTIVE) {
-		math3d_frustumLH(LS, left, right, bottom, top, near, far, g_default_homogeneous_depth);
-	} else {
-		math3d_orthoLH(LS, left, right, bottom, top, near, far, g_default_homogeneous_depth);
-	}
-
 }
 
 static int
 lprojmat(lua_State *L) {
 	struct lastack *LS = GETLS(L);
 	luaL_checktype(L, 1, LUA_TTABLE);
-	create_proj_mat(L, LS, 1);
+	const int inv_z = lua_isnoneornil(L, 2) ? 0 : lua_toboolean(L, 2);
+	create_proj_mat(L, LS, 1, inv_z);
 	lua_pushlightuserdata(L, STACKID(lastack_pop(LS)));
 	return 1;
 }
@@ -1899,25 +1907,24 @@ lfrustum_intersect_aabb_list(lua_State *L){
 	luaL_checktype(L, 2, LUA_TTABLE);
 	const int numelem = (int)lua_rawlen(L, 2);
 
-	const int visibleset_idx = 3;
-	luaL_checktype(L, visibleset_idx, LUA_TTABLE);
+	const int return_notvisible = lua_toboolean(L, 3);
 
-	int num_visible = 0;
-	
+	lua_createtable(L, numelem, 0);
+	int returnidx = 0;
 	for (int ii=0; ii<numelem; ++ii){
-		lua_geti(L, 2, ii+1);{
-			const float * aabb = (LUA_TNIL != lua_getfield(L, -1, "aabb")) ?
-				object_from_index(L, LS, -1, LINEAR_TYPE_MAT, matrix_from_table) : NULL;
-			lua_pop(L, 1);
-
-			if (aabb == NULL || math3d_frustum_intersect_aabb(LS, planes, aabb) >= 0){
-				lua_pushvalue(L, -1);
-				lua_seti(L, visibleset_idx, ++num_visible);
-			}
-		}
+		lua_geti(L, 2, ii+1);
+		const float* aabb = matrix_from_index(L, LS, -1);
 		lua_pop(L, 1);
+
+		int r = math3d_frustum_intersect_aabb(LS, planes, aabb) >= 0;
+		if (return_notvisible)
+			r = !r;
+
+		if (r){
+			lua_pushinteger(L, ii+1);
+			lua_seti(L, -2, ++returnidx);
+		}
 	}
-	lua_pushinteger(L, num_visible);
 	return 1;
 }
 
@@ -2098,6 +2105,8 @@ static void
 init_math3d_api(lua_State *L, struct math3d_api *bs) {
 		luaL_Reg l[] = {
 		{ "ref", NULL },
+		{ "mark", lmark },
+		{ "unmark", lunmark },
 		{ "constant", lconstant },
 		{ "tostring", ltostring },
 		{ "matrix", lmatrix },
