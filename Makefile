@@ -5,9 +5,12 @@ ODIR = o
 CFLAGS = -O2 -Wall
 OUTPUT=./
 
-all : $(OUTPUT)math3d.dll
+.PHONY : all test
 
-$(ODIR)/linalg.o : linalg.c | $(ODIR)
+all : $(OUTPUT)math3d.dll
+test : mathid_test.exe
+
+$(ODIR)/mathid.o : mathid.c | $(ODIR)
 	$(CC) -c $(CFLAGS) -o $@ $^ $(LUAINC)
 
 $(ODIR)/math3d.o : math3d.c | $(ODIR)
@@ -22,11 +25,14 @@ $(ODIR)/mathadapter.o : mathadapter.c | $(ODIR)
 $(ODIR)/testadapter.o : testadapter.c | $(ODIR)
 	$(CC) -c $(CFLAGS) -o $@ $^ $(LUAINC)
 
-$(OUTPUT)math3d.dll : $(ODIR)/linalg.o $(ODIR)/math3d.o $(ODIR)/math3dfunc.o $(ODIR)/mathadapter.o $(ODIR)/testadapter.o
+$(OUTPUT)math3d.dll : $(ODIR)/mathid.o $(ODIR)/math3d.o $(ODIR)/math3dfunc.o $(ODIR)/mathadapter.o $(ODIR)/testadapter.o
 	$(CXX) --shared $(CFLAGS) -o $@ $^ -lstdc++ $(LUALIB)
 
 $(ODIR) :
 	mkdir -p $@
 
 clean :
-	rm -rf $(ODIR) *.dll
+	rm -rf $(ODIR) *.dll *.exe
+
+mathid_test.exe : mathid.c
+	$(CC) $(CFLAGS) -DTEST_MATHID -o $@ $^
