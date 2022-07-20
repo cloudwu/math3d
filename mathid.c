@@ -428,7 +428,7 @@ alloc_vecarray(struct math_context *M, int vecsize) {
 		}
 	}
 	struct page *p = M->marked[page_id];
-	int index = (mem - &p->v[0][0]) / 4;
+	int index = (int)((mem - &p->v[0][0]) / 4);
 	return index + page_id * PAGE_SIZE;
 }
 

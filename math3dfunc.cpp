@@ -804,13 +804,13 @@ math3d_dir2radian(struct math_context *M, math_t rad, float radians[2]) {
 }
 
 math_t
-math3d_frustum_center(struct math_context *M, math_t points[8]) {
+math3d_frustum_center(struct math_context *M, math_t points) {
 	math_t id;
 	glm::vec4 &c = allocvec4(M, &id);
 	c = glm::vec4(0, 0, 0, 1);
 	int ii;
 	for (ii = 0; ii < 8; ++ii) {
-		c += VEC(M, points[ii]);
+		c += VEC(M, math_index(M, points, ii));
 	}
 
 	c /= 8.f;
@@ -820,12 +820,12 @@ math3d_frustum_center(struct math_context *M, math_t points[8]) {
 }
 
 float
-math3d_frustum_max_radius(struct math_context *M, math_t points[8], math_t center) {
+math3d_frustum_max_radius(struct math_context *M, math_t points, math_t center) {
 	float maxradius = 0;
 	const glm::vec4 &c = VEC(M, center);
 	int ii;
 	for (ii = 0; ii < 8; ++ii) {
-		const glm::vec4 &p = VEC(M, points[ii]);
+		const glm::vec4 &p = VEC(M, math_index(M, points, ii));
 		maxradius = glm::max(glm::length(p - c), maxradius);
 	}
 
@@ -833,7 +833,7 @@ math3d_frustum_max_radius(struct math_context *M, math_t points[8], math_t cente
 }
 
 math_t
-math3d_frusutm_aabb(struct math_context *M, math_t points[8]) {
+math3d_frusutm_aabb(struct math_context *M, math_t points) {
 	math_t aabb = math_import(M, NULL, MATH_TYPE_VEC4, 2);
 
 	glm::vec4 & minv = initvec4(M, math_index(M, aabb, 0));
@@ -844,7 +844,7 @@ math3d_frusutm_aabb(struct math_context *M, math_t points[8]) {
 
 	int ii = 0;
 	for (ii = 0; ii < 8; ++ii){
-		const auto &p = VEC(M, points[ii]);
+		const auto &p = VEC(M, math_index(M, points, ii));
 		minv = glm::min(minv, p);
 		maxv = glm::max(maxv, p);
 	}
@@ -1110,14 +1110,15 @@ math3d_frustum_planes(struct math_context *M, math_t m, int homogeneous_depth) {
 }
 
 int
-math3d_frustum_intersect_aabb(struct math_context *M, math_t planes[6], math_t aabb) {
+math3d_frustum_intersect_aabb(struct math_context *M, math_t planes, math_t aabb) {
 	int ii;
 
 	const glm::vec3 &min =  VEC3(M, math_index(M, aabb, 0));
 	const glm::vec3 &max =  VEC3(M, math_index(M, aabb, 1));
 
 	for (ii = 0; ii < 6; ++ii){
-		const int r = plane_intersect(VEC(M, planes[ii]), min, max);
+		const auto &p = VEC(M, math_index(M, planes, ii));
+		const int r = plane_intersect(p, min, max);
 		// intersect or outside frustum
 		if (r <= 0){
 			return r;
@@ -1171,7 +1172,7 @@ math3d_frustum_points(struct math_context *M, math_t m, int homogeneous_depth) {
 }
 
 void
-math3d_frustum_calc_near_far(struct math_context *M, math_t planes[6], float result[2]) {
+math3d_frustum_calc_near_far(struct math_context *M, math_t planes, float result[2]) {
 	// todo
 	result[0] = 0;
 	result[1] = 0;

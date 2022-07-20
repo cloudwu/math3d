@@ -25,6 +25,9 @@ struct refobject {
 
 static int g_default_homogeneous_depth = 0;
 static int g_origin_bottom_left = 0;
+int math3d_homogeneous_depth(){
+	return g_default_homogeneous_depth;
+}
 
 static size_t
 getlen(lua_State *L, int index) {
@@ -697,6 +700,22 @@ quat_from_index(lua_State *L, struct math_context *M, int index) {
 	return object_from_index(L, M, index, MATH_TYPE_QUAT, quat_from_table);
 }
 
+static inline math_t
+frustum_planes_from_index(lua_State *L, struct math_context *M, int index){
+	math_t planes = object_from_index(L, M, index, MATH_TYPE_VEC4, vector_from_table);
+	if (math_size(M, planes) != 6)
+		luaL_error(L, "Invalid Frustum Planes");
+	return planes;
+}
+
+static inline math_t
+frustum_points_from_index(lua_State *L, struct math_context *M, int index){
+	math_t points = object_from_index(L, M, index, MATH_TYPE_VEC4, vector_from_table);
+	if (math_size(M, points) != 8)
+		luaL_error(L, "Invalid Frustum Planes");
+	return points;
+}
+
 typedef math_t (*from_index)(lua_State *, struct math_context *, int);
 
 static math_t
@@ -728,7 +747,7 @@ array_from_index(lua_State *L, struct math_context *M, int index, int type, int 
 		return id;
 	}
 	luaL_checktype(L, index, LUA_TTABLE);
-	int n = lua_rawlen(L, index);
+	int n = (int)lua_rawlen(L, index);
 	if (expsize != 0 && expsize != n) {
 		luaL_error(L, "Need size of table %d/%d", expsize, n);
 	}
@@ -850,8 +869,8 @@ larray_matrix_ref(lua_State *L) {
 	if (ptr == NULL) {
 		return luaL_error(L, "Invalid pointer (type = %s)", lua_typename(L, lua_type(L, 1)));
 	}
-	int sz = luaL_checkinteger(L, 2);
-	int off = luaL_optinteger(L, 3, 0);
+	int sz = (int)luaL_checkinteger(L, 2);
+	int off = (int)luaL_optinteger(L, 3, 0);
 	ptr += off * 16;
 	math_t id = math_ref(M, ptr, MATH_TYPE_MAT, sz);
 	lua_pushmath(L, id);
@@ -903,7 +922,7 @@ static int
 larray_index(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	math_t v = get_id(L, M, 1);
-	int index = luaL_checkinteger(L, 2);
+	int index = (int)luaL_checkinteger(L, 2);
 	int size = math_size(M, v);
 	if (index < 0 || index >= size) {
 		return luaL_error(L, "Invalid array index (%d/%d)", index, size);
@@ -1362,20 +1381,15 @@ static int
 lminmax(lua_State *L) {
 	struct math_context *M = GETMC(L);
 
-	luaL_checktype(L, 1, LUA_TTABLE);
-	const int numpoints = (int)getlen(L, 1);
-	if (numpoints == 0)
-		return luaL_error(L, "Empty minmax points");
+	const math_t points = object_from_index(L, M, 1, MATH_TYPE_VEC4, vector_from_table);
 
-	math_t transform = object_from_index(L, M, 2, MATH_TYPE_MAT, matrix_from_table);	// can be null
+	const math_t transform = object_from_index(L, M, 2, MATH_TYPE_MAT, matrix_from_table);	// can be null
 	math_t minmax[2] = { MATH_NULL, MATH_NULL };
 
+	const int numpoints = math_size(M, points);
 	int ii;
-
 	for (ii = 0; ii < numpoints; ++ii) {
-		lua_geti(L, 1, ii+1);
-		math_t v = vector_from_index(L, M, -1);
-		lua_pop(L, 1);
+		math_t v = math_index(M, points, ii);
 		math3d_minmax(M, transform, v, minmax);
 	}
 
@@ -1828,40 +1842,16 @@ lfrustum_planes(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	math_t m = matrix_from_index(L, M, 1);
 	math_t planes = math3d_frustum_planes(M, m, g_default_homogeneous_depth);
-
-	// todo: use array instead of table
-	int i;
-	lua_createtable(L, 6, 0);
-	for (i=0;i<6;i++) {
-		lua_pushmath(L, math_index(M, planes, i));
-		lua_seti(L, -2, i+1);
-	}
-
+	lua_pushmath(L, planes);
 	return 1;
 }
 
-// todo: use array instead of table
-static inline void
-fetch_vectors_from_table(lua_State *L, struct math_context * M, int index, int checknum, math_t * vectors) {
-	const size_t num = getlen(L, index);
-	if (num != checknum){
-		luaL_error(L, "table need contain %d planes:%d", checknum, num);
-	}
-	int ii;
-	for (ii = 0; ii < num; ++ii) {
-		lua_geti(L, index, ii+1);
-		vectors[ii] = vector_from_index(L, M, -1);
-		lua_pop(L, 1);
-	}
-}
 static int
 lfrustum_intersect_aabb(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	luaL_checktype(L, 1, LUA_TTABLE);
-	math_t planes[6];
-	fetch_vectors_from_table(L, M, 1, 6, planes);
-
-	math_t aabb = aabb_from_index(L, M, 2);
+	const math_t planes = frustum_planes_from_index(L, M, 1);
+	const math_t aabb = aabb_from_index(L, M, 2);
 	lua_pushinteger(L, math3d_frustum_intersect_aabb(M, planes, aabb));
 	return 1;
 }
@@ -1869,8 +1859,7 @@ lfrustum_intersect_aabb(lua_State *L) {
 static int
 lfrustum_intersect_aabb_list(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	math_t planes[6];
-	fetch_vectors_from_table(L, M, 1, 6, planes);
+	math_t planes = frustum_planes_from_index(L, M, 1);
 
 	luaL_checktype(L, 2, LUA_TTABLE);
 	const int numelem = (int)lua_rawlen(L, 2);
@@ -1902,22 +1891,14 @@ lfrustum_points(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	math_t m = matrix_from_index(L, M, 1);
 	math_t result = math3d_frustum_points(M, m, g_default_homogeneous_depth);
-
-	lua_createtable(L, 8, 0);
-	int i;
-	for (i=0;i<8;i++) {
-		lua_pushmath(L, math_index(M, result, i));
-		lua_seti(L, -2, i+1);
-	}
-
+	lua_pushmath(L, result);
 	return 1;
 }
 
 static int
 lfrustum_calc_near_far(lua_State *L){
 	struct math_context *M = GETMC(L);
-	math_t planes[6];
-	fetch_vectors_from_table(L, M, 1, 6, planes);
+	const math_t planes = frustum_planes_from_index(L, M, 1);
 
 	float nearfar[2];
 	math3d_frustum_calc_near_far(M, planes, nearfar);
@@ -2034,10 +2015,8 @@ lmul(lua_State *L) {
 static int
 lpoints_center(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	math_t points[8];
-
-	fetch_vectors_from_table(L, M, 1, 8, points);
-	math_t center = math3d_frustum_center(M, points);
+	const math_t points = frustum_points_from_index(L, M, 1);
+	const math_t center = math3d_frustum_center(M, points);
 	lua_pushmath(L, center);
 
 	return 1;
@@ -2046,9 +2025,8 @@ lpoints_center(lua_State *L) {
 static int
 lpoints_radius(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	math_t points[8];
-	fetch_vectors_from_table(L, M, 1, 8, points);
-	math_t center = vector_from_index(L, M, 2);
+	const math_t points = frustum_points_from_index(L, M, 1);
+	const math_t center = vector_from_index(L, M, 2);
 	lua_pushnumber(L, math3d_frustum_max_radius(M, points, center));
 	return 1;
 }
@@ -2056,10 +2034,8 @@ lpoints_radius(lua_State *L) {
 static int
 lpoints_aabb(lua_State *L){
 	struct math_context *M = GETMC(L);
-	math_t points[8];
-	fetch_vectors_from_table(L, M, 1, 8, points);
+	const math_t points = frustum_points_from_index(L, M, 1);
 	lua_pushmath(L, math3d_frusutm_aabb(M, points));
-
 	return 1;
 }
 
