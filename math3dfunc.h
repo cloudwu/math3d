@@ -51,9 +51,9 @@ math_t math3d_quat_lerp(struct math_context *, math_t v0, math_t v1, float ratio
 math_t math3d_quat_slerp(struct math_context *, math_t v0, math_t v1, float ratio);
 math_t math3d_quat_to_euler(struct math_context *, math_t quat);
 void math3d_dir2radian(struct math_context *, math_t rad, float radians[2]);
-math_t math3d_frustum_center(struct math_context *, math_t points[8]);
-float math3d_frustum_max_radius(struct math_context *, math_t points[8], math_t center);
-math_t math3d_frusutm_aabb(struct math_context *, math_t points[8]);
+math_t math3d_frustum_center(struct math_context *, math_t points);
+float math3d_frustum_max_radius(struct math_context *, math_t points, math_t center);
+math_t math3d_frusutm_aabb(struct math_context *, math_t points);
 int math3d_aabb_isvalid(struct math_context *, math_t aabb);
 math_t math3d_aabb_merge(struct math_context *, math_t aabblhs, math_t aabbrhs);
 math_t math3d_aabb_transform(struct math_context *, math_t mat, math_t aabb);
@@ -64,9 +64,9 @@ int math3d_aabb_test_point(struct math_context *, math_t aabb, math_t v);
 void math3d_aabb_points(struct math_context *, math_t aabb, math_t points[8]);
 math_t math3d_aabb_expand(struct math_context *, math_t aabb, math_t e);
 math_t math3d_frustum_planes(struct math_context *, math_t m, int homogeneous_depth);	// return vec4[6]
-int math3d_frustum_intersect_aabb(struct math_context *, math_t planes[6], math_t aabb);
+int math3d_frustum_intersect_aabb(struct math_context *, math_t planes, math_t aabb);
 math_t math3d_frustum_points(struct math_context *, math_t m, int homogeneous_depth);	// return vec4[8]
-void math3d_frustum_calc_near_far(struct math_context *, math_t planes[6], float result[2]); // return { near, far }
+void math3d_frustum_calc_near_far(struct math_context *, math_t planes, float result[2]); // return { near, far }
 float math3d_point2plane(struct math_context *, math_t pt, math_t plane);
 
 #endif
