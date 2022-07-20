@@ -384,7 +384,6 @@ new_marked_page(struct math_context *M) {
 	if (M->marked_page < MAX_PAGE) {
 		M->marked[M->marked_page] = NULL;
 		M->count[M->marked_page] = NULL;
-		++M->marked_page;
 	}
 	assert(M->marked[page] == NULL);
 	M->marked[page] = (struct page *)malloc(sizeof(struct page));
