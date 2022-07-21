@@ -4,13 +4,17 @@ do
 	print "---- constant -------"
 	local c = math3d.constant "null"
 	print(c, math3d.mark(c))
-	print(math3d.tostring(c))
+	print("Identity Null",math3d.tostring(c))
 	local c = math3d.constant "v4"
-	print(math3d.tostring(c))
+	print("Identity Vec4", math3d.tostring(c))
 	local c = math3d.constant "quat"
-	print(math3d.tostring(c))
+	print("Identity Quat", math3d.tostring(c))
 	local c = math3d.constant "mat"
-	print(math3d.tostring(c))
+	print("Identity Mat",math3d.tostring(c))
+	local c = math3d.matrix {}
+	print("Identity Mat", math3d.tostring(c))
+	local c = math3d.matrix { s = 1 }
+	print("Identity Mat", math3d.tostring(c))
 
 	local iv = math3d.constant { type = "v4" }
 	print(math3d.tostring(iv))

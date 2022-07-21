@@ -164,29 +164,37 @@ math_t
 math3d_make_srt(struct math_context *M, math_t s, math_t r, math_t t) {
 	math_t id;
 	glm::mat4x4 &srt = allocmat(M, &id);
+	int ident = 1;
 	if (!math_isnull(s)) {
 		srt = glm::mat4x4(1);
 		const glm::vec3 &scale = VEC3(M, s);
 		srt[0][0] = scale[0];
 		srt[1][1] = scale[1];
 		srt[2][2] = scale[2];
+		if (scale[0] != 1 || scale[1] != 1 || scale[2] != 1)
+			ident = 0;
 	}
-	if (!math_isnull(r)) {
+	if (!math_isnull(r) && !math_isidentity(r)) {
 		const glm::quat &q = QUAT(M, r);
-		if (!math_isnull(s)) {
+		if (!ident) {
 			srt = glm::mat4x4(q) * srt;
 		} else {
 			srt = glm::mat4x4(q);
 		}
+		ident = 0;
 	} else if (math_isnull(s)) {
 		srt = glm::mat4x4(1);
 	}
-	if (!math_isnull(t)) {
+	if (!math_isnull(t) && !math_isidentity(t)) {
 		const glm::vec3 &translate = VEC3(M, t);
 		srt[3][0] = translate[0];
 		srt[3][1] = translate[1];
 		srt[3][2] = translate[2];
 		srt[3][3] = 1;
+		ident = 0;
+	}
+	if (ident) {
+		return math_identity(MATH_TYPE_MAT);
 	}
 
 	return id;
