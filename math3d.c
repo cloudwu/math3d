@@ -2363,10 +2363,9 @@ math3d_push_(lua_State *L, struct math_context *M, const float *v, int type) {
 	lua_pushlightuserdata(L, MATH_TO_HANDLE(id));
 }
 
-static void
-math3d_ref_(lua_State *L, struct math_context *M, const float *v, int type) {
-	math_t id = math_ref(M, v, type, 1);
-	lua_pushlightuserdata(L, MATH_TO_HANDLE(id));
+static math_t
+math3d_ref_(struct math_context *M, const float *v, int type) {
+	return math_ref(M, v, type, 1);
 }
 
 static math_t

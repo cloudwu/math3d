@@ -11,7 +11,7 @@ struct math3d_api {
 	math_t (*from_lua_id)(lua_State *L, struct math_context *MC, int index);
 	float * (*getptr)(struct math_context *MC, math_t id, int *type);
 	void (*push)(lua_State *L, struct math_context *MC, const float *v, int type);
-	void (*ref)(lua_State *L, struct math_context *MC, const float *v, int type);
+	math_t (*ref)(struct math_context *MC, const float *v, int type);
 	math_t (*mark_id)(lua_State *L, struct math_context *MC, int idx);
 	void (*unmark_id)(struct math_context *MC, math_t id);
 };
@@ -35,9 +35,9 @@ math3d_push(lua_State *L, struct math3d_api *M, const float *v, int type) {
 	M->push(L, M->MC, v, type);
 }
 
-static inline void
-math3d_ref(lua_State *L, struct math3d_api *M, const float *v, int type) {
-	M->ref(L, M->MC, v, type);
+static inline math_t
+math3d_ref(struct math3d_api *M, const float *v, int type) {
+	return M->ref(M->MC, v, type);
 }
 
 static inline math_t
