@@ -897,6 +897,7 @@ lmul_array(lua_State *L) {
 	return 1;
 }
 
+/*
 static int
 lassign(lua_State *L) {
 	struct math_context *M = GETMC(L);
@@ -924,6 +925,7 @@ lassign(lua_State *L) {
 	memcpy(math_init(M, ref), math_value(M, id), sz * sizeof(float));
 	return 0;
 }
+*/
 
 static int
 larray_vector(lua_State *L) {
@@ -2252,7 +2254,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "ref", NULL },
 		{ "mark", lmark },
 		{ "unmark", lunmark },
-		{ "assign", lassign },
+//		{ "assign", lassign },
 		{ "constant", lconstant },
 		{ "constant_array", lconstant_array },
 		{ "tostring", ltostring },
