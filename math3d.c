@@ -71,7 +71,7 @@ lua_pushmath(lua_State *L, math_t id) {
 static inline struct math_context *
 GETMC(lua_State *L) {
 	struct math3d_api *M = (struct math3d_api *)lua_touserdata(L, lua_upvalueindex(1));
-	return M->MC;
+	return M->M;
 }
 
 static void
@@ -85,9 +85,9 @@ finalize(lua_State *L, lua_CFunction gc) {
 static int
 boxstack_gc(lua_State *L) {
 	struct math3d_api *M = (struct math3d_api *)lua_touserdata(L, 1);
-	if (M->MC) {
-		math_delete(M->MC);
-		M->MC = NULL;
+	if (M->M) {
+		math_delete(M->M);
+		M->M = NULL;
 	}
 	return 0;
 }
@@ -2357,42 +2357,6 @@ math3d_from_lua_id_(lua_State *L, struct math_context *M, int index) {
 	return id;
 }
 
-static void
-math3d_push_(lua_State *L, struct math_context *M, const float *v, int type) {
-	math_t id = math_import(M, v, type, 1);
-	lua_pushlightuserdata(L, MATH_TO_HANDLE(id));
-}
-
-static math_t
-math3d_ref_(struct math_context *M, const float *v, int type, int size) {
-	return math_ref(M, v, type, size);
-}
-
-static math_t
-math3d_mark_id_(lua_State *L, struct math_context *M, int idx) {
-	math_t id = get_id_api(L, M, idx);
-	return math_mark(M, id);
-}
-
-static void
-math3d_unmark_id_(struct math_context *M, math_t id) {
-	math_unmark(M, id);
-}
-
-static const float *
-math3d_getptr_(struct math_context *M, math_t id, int *type) {
-	if (type) {
-		*type = math_type(M, id);
-	}
-	return math_value(M, id);
-}
-
-static float *
-math3d_create_(struct math_context *M, int type, int size, math_t *id) {
-	*id = math_import(M, NULL, type, size);
-	return math_init(M, *id);
-}
-
 LUAMOD_API int
 luaopen_math3d(lua_State *L) {
 	luaL_checkversion(L);
@@ -2408,16 +2372,10 @@ luaopen_math3d(lua_State *L) {
 	int refmeta = lua_gettop(L);
 
 	struct math3d_api * M = lua_newuserdatauv(L, sizeof(struct math3d_api), 0);
-	M->MC = math_new();
+	M->M = math_new();
 	M->refmeta = lua_topointer(L, refmeta);
 	M->from_lua = math3d_from_lua_;
 	M->from_lua_id = math3d_from_lua_id_;
-	M->mark_id = math3d_mark_id_;
-	M->unmark_id = math3d_unmark_id_;
-	M->push = math3d_push_;
-	M->ref = math3d_ref_;
-	M->create = math3d_create_;
-	M->getptr = math3d_getptr_;
 
 	finalize(L, boxstack_gc);
 	lua_setfield(L, LUA_REGISTRYINDEX, MATH3D_CONTEXT);

@@ -4,6 +4,7 @@
 #include <lauxlib.h>
 #include <stdint.h>
 #include "math3d.h"
+#include "mathid.h"
 
 typedef enum {
 	SET_Mat = 0x01,
@@ -19,7 +20,7 @@ math3d_interface(lua_State *L) {
 static inline void *
 get_pointer(lua_State *L, struct math3d_api *api, int index, int type) {
 	math_t id = math3d_from_lua(L, api, index, type);
-	return (void *)math3d_value(api, id,  &type);
+	return (void *)math_value(api->M, id);
 }
 
 static void *
@@ -169,8 +170,7 @@ check_elem_type(lua_State *L, struct math3d_api *api, int index) {
 	}
 
 	math_t id = math3d_from_lua_id(L, api, index);
-	int type;
-	math3d_value(api, id, &type);
+	int type = math_type(api->M, id);
 	return type == MATH_TYPE_MAT ? SET_Mat : SET_Vec;
 }
 
@@ -351,7 +351,8 @@ get_n(lua_State *L, int n, struct stack_buf *prev) {
 				luaL_error(L,"Invalid getter format %s", format);
 				break;
 			}
-			math3d_push(L, api, prev->mat, type);
+			math_t id = math_import(api->M, prev->mat, type, 1);
+			lua_pushlightuserdata(L, (void *)id.idx);
 			lua_insert(L, ret+1);
 
 			prev = prev->prev;
@@ -407,7 +408,8 @@ loutput_object(lua_State *L, int ltype) {
 			return luaL_error(L, "ret %d should be a lightuserdata", i);
 		}
 		const float *v = (const float *)lua_touserdata(L, i);
-		math3d_push(L, api, v, ltype);
+		math_t id = math_import(api->M, v, ltype, 1);
+		lua_pushlightuserdata(L, (void *)id.idx);
 		lua_replace(L, i);
 	}
 	return retn;
