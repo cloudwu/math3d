@@ -32,6 +32,7 @@ int math_valid(struct math_context *, math_t id);
 int math_marked(struct math_context *, math_t id);
 void math_print(struct math_context *, math_t id);	// for debug only
 const char * math_typename(int type);
+math_t math_constant(struct math_context *, math_t);
 
 static inline int
 math_issame(math_t id1, math_t id2) {
@@ -79,6 +80,16 @@ math_identity(int type) {
 
 static inline int
 math_isidentity(math_t id) {
+	union {
+		math_t id;
+		struct math_id s;
+	} u;
+	u.id = id;
+	return (!u.s.transient && u.s.frame == 0 && u.s.index == 0);
+}
+
+static inline int
+math_isconstant(math_t id) {
 	union {
 		math_t id;
 		struct math_id s;

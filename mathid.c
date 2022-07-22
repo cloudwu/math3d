@@ -36,6 +36,7 @@ struct math_unmarked {
 };
 
 struct math_context {
+	struct page * constant[MAX_PAGE];
 	struct page * transient[MAX_PAGE];
 	struct page * marked[MAX_PAGE];
 	struct marked_count *count[MAX_PAGE];
@@ -45,6 +46,7 @@ struct math_context {
 	int n;
 	int marked_page;
 	int marked_n;
+	int constant_n;
 };
 
 static inline int
@@ -86,7 +88,9 @@ math_new() {
 	m->marked[0] = NULL;
 	m->count[0] = NULL;
 	m->transient[0] = NULL;
+	m->constant[0] = NULL;
 	m->marked_n = 0;
+	m->constant_n = 0;
 	math_unmarked_init(&m->unmarked);
 	return m;
 }
@@ -96,6 +100,12 @@ math_delete(struct math_context *M) {
 	if (M == NULL)
 		return;
 	int i;
+	for (i=0;i<MAX_PAGE;i++) {
+		if (M->constant[i] == NULL) {
+			break;
+		}
+		free(M->constant[i]);
+	}
 	for (i=0;i<MAX_PAGE;i++) {
 		if (M->transient[i] == NULL) {
 			break;
@@ -122,6 +132,12 @@ size_t
 math_memsize(struct math_context *M) {
 	size_t sz = sizeof(*M);
 	int i;
+	for (i=0;i<MAX_PAGE;i++) {
+		if (M->constant[i] == NULL) {
+			break;
+		}
+		sz += sizeof(struct page);
+	}
 	for (i=0;i<MAX_PAGE;i++) {
 		if (M->transient[i] == NULL) {
 			break;
@@ -289,12 +305,20 @@ math_marked(struct math_context *M, math_t id) {
 	return M->count[page_id]->count[index] > 0;
 }
 
-float *
+static float *
 get_marked(struct math_context *M, int index) {
 	int page_id = index / PAGE_SIZE;
 	index %= PAGE_SIZE;
 	assert (page_id < M->marked_page);
 	return M->marked[page_id]->v[index];
+}
+
+static inline const float *
+get_constant(struct math_context *M, int index) {
+	assert(index < M->constant_n);
+	int page_id = index / PAGE_SIZE;
+	index %= PAGE_SIZE;
+	return M->constant[page_id]->v[index];
 }
 
 math_t
@@ -309,10 +333,11 @@ math_index(struct math_context *M, math_t id, int index) {
 	if (u.s.type == MATH_TYPE_REF) {
 		u.s.size = index;
 		return u.id;
-	} else if (!u.s.transient) {
+	} else if (!u.s.transient && u.s.frame > 0) {
+		// marked
 		u.s.frame = 2 + index;
 	} else {
-		// transient
+		// transient or constant
 		u.s.size = 0;
 		if (u.s.type == MATH_TYPE_MAT)
 			index *= 4;
@@ -363,7 +388,11 @@ math_value(struct math_context *M, math_t id) {
 			}
 			return get_marked(M, index);
 		} else {
-			return get_identity(u.s.type);
+			if (u.s.index == 0) {
+				return get_identity(u.s.type);
+			} else {
+				return get_constant(M, u.s.index - 1);
+			}
 		}
 	}
 }
@@ -432,6 +461,94 @@ alloc_vecarray(struct math_context *M, int vecsize) {
 	struct page *p = M->marked[page_id];
 	int index = (int)((mem - &p->v[0][0]) / 4);
 	return index + page_id * PAGE_SIZE;
+}
+
+static void
+prepare_constant_page(struct math_context *M, int page) {
+	assert(page < MAX_PAGE);
+	if (M->constant[page] == NULL) {
+		M->constant[page] = (struct page *)malloc(sizeof(struct page));
+		if (page + 1 < MAX_PAGE) {
+			M->constant[page+1] = NULL;
+		}
+	}
+}
+
+static int
+alloc_constant(struct math_context *M, const float *v, int n) {
+	assert(n <= PAGE_SIZE);
+	// search v first
+	int i;
+	for (i=0;i<=M->constant_n - n;i++) {
+		const float * vv = get_constant(M, i);
+		if (memcmp(v, vv, n * 4 * sizeof(float))== 0)
+			return i;
+	}
+
+	int page_id = M->constant_n / PAGE_SIZE;
+	int index = M->constant_n % PAGE_SIZE;
+	prepare_constant_page(M, page_id);
+	if (index + n > PAGE_SIZE) {
+		page_id++;
+		index = 0;
+		prepare_constant_page(M, page_id);
+		M->constant_n = page_id * PAGE_SIZE + n;
+	} else {
+		M->constant_n += n;
+	}
+	memcpy(M->constant[page_id]->v[index], v, n * 4 * sizeof(float));
+
+	return M->constant_n - n;
+}
+
+static int
+is_identity(struct math_context *M, math_t v) {
+	int type = math_type(M, v);
+	const float *ptr = math_value(M, v);
+	const float *iptr = math_value(M, math_identity(type));
+	switch (type) {
+	case MATH_TYPE_MAT:
+		return memcmp(ptr, iptr, 16 * sizeof(float)) == 0;
+	case MATH_TYPE_VEC4:
+	case MATH_TYPE_QUAT:
+		return memcmp(ptr, iptr, 4 * sizeof(float)) == 0;
+	}
+	return 0;
+}
+
+math_t
+math_constant(struct math_context *M, math_t v) {
+	if (math_isconstant(v))
+		return v;
+	int sz = math_size(M, v);
+	int type = math_type(M, v);
+	if (sz == 1 && is_identity(M, v)) {
+		return math_identity(type);
+	}
+	int offset;
+	const float * ptr = math_value(M, v);
+	switch (type) {
+	case MATH_TYPE_MAT:
+		offset = alloc_constant(M, ptr, sz * 4);
+		break;
+	case MATH_TYPE_VEC4:
+	case MATH_TYPE_QUAT:
+		offset = alloc_constant(M, ptr, sz);
+		break;
+	default:
+		assert(0);
+		return MATH_NULL;
+	}
+	union {
+		math_t id;
+		struct math_id s;
+	} u;
+	u.s.index = offset + 1;
+	u.s.size = sz - 1;
+	u.s.frame = 0;
+	u.s.type = type;
+	u.s.transient = 0;
+	return u.id;
 }
 
 static math_t

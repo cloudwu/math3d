@@ -9,7 +9,7 @@ struct math3d_api {
 	const void * refmeta;
 	math_t (*from_lua)(lua_State *L, struct math_context *MC, int index, int type);
 	math_t (*from_lua_id)(lua_State *L, struct math_context *MC, int index);
-	float * (*getptr)(struct math_context *MC, math_t id, int *type);
+	const float * (*getptr)(struct math_context *MC, math_t id, int *type);
 	void (*push)(lua_State *L, struct math_context *MC, const float *v, int type);
 	float * (*create)(struct math_context *MC, int type, int size, math_t *id);
 	math_t (*ref)(struct math_context *MC, const float *v, int type, int size);

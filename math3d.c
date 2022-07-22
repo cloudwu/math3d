@@ -897,36 +897,6 @@ lmul_array(lua_State *L) {
 	return 1;
 }
 
-/*
-static int
-lassign(lua_State *L) {
-	struct math_context *M = GETMC(L);
-	math_t ref = get_id(L, M, 1);
-	if (!math_isref(M, ref)) {
-		return luaL_error(L, "Need ref id");
-	}
-	math_t id;
-	int sz = 4;
-	int type = math_type(M, ref);
-	switch (type) {
-	case MATH_TYPE_MAT:
-		id = matrix_from_index(L, M, 2);
-		sz = 16;
-		break;
-	case MATH_TYPE_VEC4:
-		id = vector_from_index(L, M, 2);
-		break;
-	case MATH_TYPE_QUAT:
-		id = quat_from_index(L, M, 2);
-		break;
-	default:
-		return luaL_error(L, "Unsupport math ref type %s", math_typename(type));
-	}
-	memcpy(math_init(M, ref), math_value(M, id), sz * sizeof(float));
-	return 0;
-}
-*/
-
 static int
 larray_vector(lua_State *L) {
 	struct math_context *M = GETMC(L);
@@ -2224,7 +2194,8 @@ lconstant(lua_State *L) {
 		id = aabb_from_table(L, M, -1);
 		break;
 	}
-	lua_pushlightuserdata(L, MATH_TO_HANDLE(math_mark(M, id)));
+	id = math_constant(M, id);
+	lua_pushmath(L, id);
 	return 1;
 }
 
@@ -2244,7 +2215,7 @@ lconstant_array(lua_State *L) {
 
 	struct math_context * M = GETMC(L);
 	math_t id = array_from_index(L, M, 2, type, 0);
-	lua_pushlightuserdata(L, MATH_TO_HANDLE(math_mark(M, id)));
+	lua_pushmath(L, math_constant(M, id));
 	return 1;
 }
 
@@ -2254,7 +2225,6 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "ref", NULL },
 		{ "mark", lmark },
 		{ "unmark", lunmark },
-//		{ "assign", lassign },
 		{ "constant", lconstant },
 		{ "constant_array", lconstant_array },
 		{ "tostring", ltostring },
@@ -2410,12 +2380,12 @@ math3d_unmark_id_(struct math_context *M, math_t id) {
 	math_unmark(M, id);
 }
 
-static float *
+static const float *
 math3d_getptr_(struct math_context *M, math_t id, int *type) {
 	if (type) {
 		*type = math_type(M, id);
 	}
-	return math_init(M, id);
+	return math_value(M, id);
 }
 
 static float *

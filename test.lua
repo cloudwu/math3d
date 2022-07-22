@@ -17,20 +17,32 @@ do
 	print("Identity Mat", math3d.tostring(c))
 
 	local iv = math3d.constant { type = "v4" }
-	print(math3d.tostring(iv))
+	print(iv, math3d.tostring(iv))
 	local qv = math3d.constant { type = "quat" }
-	print(math3d.tostring(qv))
+	print(qv, math3d.tostring(qv))
 	local mv = math3d.constant { type = "mat" }
-	print(math3d.tostring(mv))
+	print(mv, math3d.tostring(mv))
+
+	assert(math3d.constant("v4", 0,0,0,1) == math3d.constant "v4")
+	assert(math3d.constant("quat", 0,0,0,1) == math3d.constant "quat")
+	assert(math3d.constant("mat", 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1) == math3d.constant "mat")
 
 	local vec = math3d.constant { type = "v4", 1,2,3,4 }
-	print(math3d.tostring(vec))
+	print(vec, math3d.tostring(vec))
+
+	local vec2 = math3d.constant { type = "v4", 1,2,3,4 }
+	print(vec2, math3d.tostring(vec))
+
+	assert(vec == vec2)
 
 	local vec = math3d.constant ("v4", { 0,0,0,0 })
-	print(math3d.tostring(vec))
+	print(vec, math3d.tostring(vec))
 
 	local aabb = math3d.constant { type = "aabb", 1,1,1,2,2,2 }
-	print(math3d.tostring(aabb))
+	print(aabb, math3d.tostring(aabb))
+
+	local vec = math3d.constant { type = "v4", 1,1,1,0 }
+	print(vec, math3d.tostring(vec))
 end
 
 local ref1, ref2, ref3
