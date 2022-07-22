@@ -2135,10 +2135,9 @@ lpoint2plane(lua_State *L){
 
 static int
 lvalue_ptr(lua_State *L){
-	struct math3d_api *api = (struct math3d_api *)lua_touserdata(L, lua_upvalueindex(1));
-	math_t id = math3d_from_lua_id(L, api, 1);
-	int type;
-	lua_pushlightuserdata(L, (void *)math3d_value(api, id, &type));
+	struct math_context *M = GETMC(L);
+	math_t id = get_id(L, M, 1);
+	lua_pushlightuserdata(L, (void *)math_value(M, id));
 	return 1;
 }
 
