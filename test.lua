@@ -11,10 +11,12 @@ do
 	print("Identity Quat", math3d.tostring(c))
 	local c = math3d.constant "mat"
 	print("Identity Mat",math3d.tostring(c))
-	local c = math3d.matrix {}
-	print("Identity Mat", math3d.tostring(c))
-	local c = math3d.matrix { s = 1 }
-	print("Identity Mat", math3d.tostring(c))
+	local c1 = math3d.matrix {}
+	assert(c == c1)
+	local c2 = math3d.matrix { s = 1 }
+	assert(c == c2)
+	local c3 = math3d.matrix { s = 1 , t = { 0,0,0 } }
+	assert(c == c3)
 
 	local iv = math3d.constant { type = "v4" }
 	print(iv, math3d.tostring(iv))

@@ -160,21 +160,38 @@ math3d_make_quat_from_euler(struct math_context *M, math_t euler) {
 	return math_quat(M, &q[0]);
 }
 
+static int
+scale1(struct math_context *M, math_t s) {
+	const float * v = math_value(M, s);
+	return v[0] == 1 && v[1] == 1 && v[2] == 1;
+}
+
+static int
+rot0(struct math_context *M, math_t r) {
+	const float * v = math_value(M, r);
+	return v[0] == 0 && v[1] == 0 && v[2] == 0 && v[3] == 1;
+}
+
+static int
+trans0(struct math_context *M, math_t t) {
+	const float * v = math_value(M, t);
+	return v[0] == 0 && v[1] == 0 && v[2] == 0;
+}
+
 math_t
 math3d_make_srt(struct math_context *M, math_t s, math_t r, math_t t) {
 	math_t id;
 	glm::mat4x4 &srt = allocmat(M, &id);
 	int ident = 1;
-	if (!math_isnull(s)) {
+	if (!math_isnull(s) && !scale1(M, s)) {
 		srt = glm::mat4x4(1);
 		const glm::vec3 &scale = VEC3(M, s);
 		srt[0][0] = scale[0];
 		srt[1][1] = scale[1];
 		srt[2][2] = scale[2];
-		if (scale[0] != 1 || scale[1] != 1 || scale[2] != 1)
-			ident = 0;
+		ident = 0;
 	}
-	if (!math_isnull(r) && !math_isidentity(r)) {
+	if (!math_isnull(r) && !rot0(M, r)) {
 		const glm::quat &q = QUAT(M, r);
 		if (!ident) {
 			srt = glm::mat4x4(q) * srt;
@@ -182,10 +199,10 @@ math3d_make_srt(struct math_context *M, math_t s, math_t r, math_t t) {
 			srt = glm::mat4x4(q);
 		}
 		ident = 0;
-	} else if (math_isnull(s)) {
+	} else if (ident) {
 		srt = glm::mat4x4(1);
 	}
-	if (!math_isnull(t) && !math_isidentity(t)) {
+	if (!math_isnull(t) && !trans0(M, t)) {
 		const glm::vec3 &translate = VEC3(M, t);
 		srt[3][0] = translate[0];
 		srt[3][1] = translate[1];
