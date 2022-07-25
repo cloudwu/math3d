@@ -732,8 +732,8 @@ block_size(int64_t *ptr, int64_t *endptr, int *r_index, int *r_size) {
 			return ptr;
 		int next_size;
 		int next_index = math_unmark_index_(*ptr, &next_size);
-		if (index + size == next_index) {
-			// continuous block
+		if (index + size == next_index && (index / PAGE_SIZE == next_index / PAGE_SIZE)) {
+			// continuous block and at the same page
 			*r_size += next_size;
 			size = next_size;
 			index = next_index;
