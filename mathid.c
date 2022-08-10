@@ -335,6 +335,7 @@ math_index(struct math_context *M, math_t id, int index) {
 		return u.id;
 	} else if (!u.s.transient && u.s.frame > 0) {
 		// marked
+		u.s.size = 0;
 		u.s.frame = 2 + index;
 	} else {
 		// transient or constant
@@ -386,7 +387,7 @@ math_value(struct math_context *M, math_t id) {
 			if (offset && u.s.type == MATH_TYPE_MAT) {
 				offset *= 4;
 			}
-			return get_marked(M, index);
+			return get_marked(M, index + offset);
 		} else {
 			if (u.s.index == 0) {
 				return get_identity(u.s.type);
