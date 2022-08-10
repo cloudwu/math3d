@@ -383,11 +383,16 @@ math_value(struct math_context *M, math_t id) {
 	} else {
 		if (u.s.frame) {
 			int index = u.s.index;
-			int offset = u.s.frame - 2;
-			if (offset && u.s.type == MATH_TYPE_MAT) {
-				offset *= 4;
+			if (u.s.frame > 1) {
+				// indexed array
+				int offset = u.s.frame - 2;
+				if (offset && u.s.type == MATH_TYPE_MAT) {
+					offset *= 4;
+				}
+				return get_marked(M, index + offset);
+			} else {
+				return get_marked(M, index);
 			}
-			return get_marked(M, index + offset);
 		} else {
 			if (u.s.index == 0) {
 				return get_identity(u.s.type);
