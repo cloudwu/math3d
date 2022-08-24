@@ -1037,6 +1037,7 @@ lset_columns(lua_State *L){
 			math_value(M, vector_from_index(L, M, ii));
 		memcpy(nm+offset, v, sizeof(float)*4);
 	}
+	lua_pushmath(L, id);
 	return 1;
 }
 
