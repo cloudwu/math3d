@@ -679,31 +679,40 @@ lreset(lua_State *L) {
 
 static inline math_t
 vector_from_index(lua_State *L, struct math_context *M, int index) {
-	return object_from_index(L, M, index, MATH_TYPE_VEC4, vector_from_table);
+	math_t r = object_from_index(L, M, index, MATH_TYPE_VEC4, vector_from_table);
+	if (math_isnull(r))
+		luaL_error(L, "Need vector, it's null");
+	return r;
 }
 
 static inline math_t
 aabb_from_index(lua_State *L, struct math_context *M, int index) {
 	math_t aabb = object_from_index(L, M, index, MATH_TYPE_VEC4, aabb_from_table);
-	if (math_size(M, aabb) != 2)
+	if (math_isnull(aabb) || math_size(M, aabb) != 2)
 		luaL_error(L, "Invalid AABB");
 	return aabb;
 }
 
 static inline math_t
 matrix_from_index(lua_State *L, struct math_context *M, int index) {
-	return object_from_index(L, M, index, MATH_TYPE_MAT, matrix_from_table);
+	math_t r = object_from_index(L, M, index, MATH_TYPE_MAT, matrix_from_table);
+	if (math_isnull(r))
+		luaL_error(L, "Need matrix, it's null");
+	return r;
 }
 
 static inline math_t
 quat_from_index(lua_State *L, struct math_context *M, int index) {
-	return object_from_index(L, M, index, MATH_TYPE_QUAT, quat_from_table);
+	math_t r = object_from_index(L, M, index, MATH_TYPE_QUAT, quat_from_table);
+	if (math_isnull(r))
+		luaL_error(L, "Need quat, it's null");
+	return r;
 }
 
 static inline math_t
 frustum_planes_from_index(lua_State *L, struct math_context *M, int index){
 	math_t planes = object_from_index(L, M, index, MATH_TYPE_VEC4, vector_from_table);
-	if (math_size(M, planes) != 6)
+	if (math_isnull(planes) || math_size(M, planes) != 6)
 		luaL_error(L, "Invalid Frustum Planes");
 	return planes;
 }
@@ -711,7 +720,7 @@ frustum_planes_from_index(lua_State *L, struct math_context *M, int index){
 static inline math_t
 frustum_points_from_index(lua_State *L, struct math_context *M, int index){
 	math_t points = object_from_index(L, M, index, MATH_TYPE_VEC4, vector_from_table);
-	if (math_size(M, points) != 8)
+	if (math_isnull(points) || math_size(M, points) != 8)
 		luaL_error(L, "Invalid Frustum Planes");
 	return points;
 }
