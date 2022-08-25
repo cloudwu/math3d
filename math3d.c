@@ -778,7 +778,7 @@ array_from_index(lua_State *L, struct math_context *M, int index, int type, int 
 		esize = 4;
 		break;
 	default:
-		luaL_error(L, "Unsupport array type %s", math_typename(type));
+		luaL_error(L, "Unsupported array type %s", math_typename(type));
 		return MATH_NULL;
 	}
 
@@ -1560,7 +1560,7 @@ lisequal(lua_State *L){
 		case MATH_TYPE_MAT: numelem = 16; break;
 		case MATH_TYPE_VEC4: numelem = 3; break;
 		case MATH_TYPE_QUAT: numelem = 4; break;
-		default: luaL_error(L, "invalide type: %s", math_typename(type0));break;
+		default: luaL_error(L, "invalid type: %s", math_typename(type0));break;
 	}
 
 	int ii;
@@ -1587,7 +1587,7 @@ lquat2euler(lua_State *L) {
 // input: view direction vector
 // output: 
 //		output radianX and radianY which can used to create quaternion that around x-axis and y-axis, 
-//		multipy those quaternions can recreate view direction vector
+//		multiply those quaternions can recreate view direction vector
 static int
 ldir2radian(lua_State *L) {
 	struct math_context *M = GETMC(L);
