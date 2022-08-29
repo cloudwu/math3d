@@ -654,7 +654,7 @@ static void
 math_unmarked_insert(struct math_unmarked *u, struct math_id id) {
 	if (u->n >= u->cap) {
 		int newcap = u->cap * 3 / 2;
-		int64_t *newindex = (int64_t *)malloc(newcap * sizeof(int));
+		int64_t *newindex = (int64_t *)malloc(newcap * sizeof(int64_t));
 		memcpy(newindex, u->index, u->n * sizeof(int64_t));
 		if (u->index != u->tmp) {
 			free(u->index);
