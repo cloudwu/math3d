@@ -739,7 +739,7 @@ math3d_aabb_merge(struct math_context *M, math_t aabblhs, math_t aabbrhs) {
 	math_t max_id = v[0];
 	for (i=1;i<4;i++) {
 		min_id = minv(M, min_id, v[i]);
-		max_id = maxv(M, min_id, v[i]);
+		max_id = maxv(M, max_id, v[i]);
 	}
 	if (math_issame(min_id, v[0]) && math_issame(max_id, v[1])) {
 		return aabblhs;
