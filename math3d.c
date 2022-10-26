@@ -5,6 +5,7 @@
 #include <math.h>
 #include <string.h>
 #include <float.h>
+#include <assert.h>
 
 #ifndef _MSC_VER
 #ifndef M_PI
@@ -165,11 +166,17 @@ lmark(lua_State *L) {
 	return 1;
 }
 
+static inline void
+unmark_check(struct math_context *M, math_t id) {
+	int r = math_unmark(M, id);
+	assert(r>=0);
+}
+
 static int
 lunmark(lua_State *L) {
 	luaL_checktype(L, 1, LUA_TLIGHTUSERDATA);
 	math_t id = HANDLE_TO_MATH(lua_touserdata(L, 1));
-	math_unmark(GETMC(L), id);
+	unmark_check(GETMC(L), id);
 	return 0;
 }
 
@@ -394,7 +401,7 @@ ref_set_key(lua_State *L){
 	default:
 		return luaL_error(L, "Invalid set key %s with ref object", key); 
 	}
-	math_unmark(M, oid);
+	unmark_check(M, oid);
 	return 0;
 }
 
@@ -407,7 +414,7 @@ ref_set_number(lua_State *L){
 	math_t oid = R->id;
 
 	R->id = math_mark(M, set_index_object(L, M, oid));
-	math_unmark(M, oid);
+	unmark_check(M, oid);
 
 	return 0;
 }
@@ -623,7 +630,7 @@ ltostring(lua_State *L) {
 static int
 lref_gc(lua_State *L) {
 	struct refobject *R = lua_touserdata(L, 1);
-	math_unmark(GETMC(L), R->id);
+	unmark_check(GETMC(L), R->id);
 	R->id = MATH_NULL;
 	return 0;
 }

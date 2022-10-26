@@ -24,7 +24,7 @@ math_t math_import(struct math_context *, const float *v, int type, int size);
 math_t math_ref(struct math_context *, const float *v, int type, int size);
 math_t math_premark(struct math_context *, int type, int size);
 math_t math_mark(struct math_context *, math_t id);
-void math_unmark(struct math_context *, math_t id);
+int math_unmark(struct math_context *, math_t id);
 const float * math_value(struct math_context *, math_t id);
 float *math_init(struct math_context *, math_t id);
 math_t math_index(struct math_context *, math_t id, int index);

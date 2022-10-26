@@ -665,17 +665,18 @@ math_unmarked_insert(struct math_unmarked *u, struct math_id id) {
 	u->index[u->n++] = math_unmark_handle_(id);
 }
 
-void
+int
 math_unmark(struct math_context *M, math_t id) {
 	union {
 		math_t id;
 		struct math_id s;
 	} u;
 	u.id = id;
-	assert(u.s.transient == 0);
 	if (u.s.frame == 0)
-		return;
-	assert (u.s.frame == 1);
+		return 0;
+	if (u.s.transient != 0 || u.s.frame != 1) {
+		return -1;
+	}
 	int index = u.s.index;
 	int page_id = index / PAGE_SIZE;
 	index %= PAGE_SIZE;
@@ -694,6 +695,7 @@ math_unmark(struct math_context *M, math_t id) {
 		math_unmarked_insert(&M->unmarked, u.s);
 	}
 	*count = c - 1;
+	return c;
 }
 
 math_t
