@@ -176,7 +176,9 @@ static int
 lunmark(lua_State *L) {
 	luaL_checktype(L, 1, LUA_TLIGHTUSERDATA);
 	math_t id = HANDLE_TO_MATH(lua_touserdata(L, 1));
-	unmark_check(GETMC(L), id);
+	if (math_unmark(GETMC(L), id) < 0) {
+		return luaL_error(L, "Invalid mathid");
+	}
 	return 0;
 }
 
