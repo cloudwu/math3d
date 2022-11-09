@@ -2389,9 +2389,14 @@ luaopen_math3d(lua_State *L) {
 	};
 	luaL_newlibtable(L,ref_mt);
 	int refmeta = lua_gettop(L);
+	int maxpage = 0;
+	if (lua_getfield(L, LUA_REGISTRYINDEX, "MATH3D_MAXPAGE") == LUA_TNUMBER) {
+		maxpage = lua_tointeger(L, -1);
+	}
+	lua_pop(L, 1);
 
 	struct math3d_api * M = lua_newuserdatauv(L, sizeof(struct math3d_api), 0);
-	M->M = math_new();
+	M->M = math_new(maxpage);
 	M->refmeta = lua_topointer(L, refmeta);
 	M->from_lua = math3d_from_lua_;
 	M->from_lua_id = math3d_from_lua_id_;

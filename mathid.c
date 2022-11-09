@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <inttypes.h>
 
-#define MAX_PAGE 256
+#define DEFAULT_MAX_PAGE 256
 #define PAGE_SIZE 1024
 #define UNMARK_SIZE 1024
 
@@ -35,13 +35,18 @@ struct math_unmarked {
 	int64_t tmp[UNMARK_SIZE];
 };
 
+struct pages {
+	struct page * constant;
+	struct page * transient;
+	struct page * marked;
+	struct marked_count *count;
+};
+
 struct math_context {
-	struct page * constant[MAX_PAGE];
-	struct page * transient[MAX_PAGE];
-	struct page * marked[MAX_PAGE];
-	struct marked_count *count[MAX_PAGE];
+	struct pages *p;
 	struct math_unmarked unmarked;
 	struct marked_freelist *freelist;
+	int maxpage;
 	int frame;
 	int n;
 	int marked_page;
@@ -79,16 +84,17 @@ math_unmarked_size(struct math_unmarked *u) {
 }
 
 struct math_context *
-math_new() {
+math_new(int maxpage) {
 	struct math_context * m = (struct math_context *)malloc(sizeof(*m));
+	if (maxpage <= 0)
+		maxpage = DEFAULT_MAX_PAGE;
+	m->maxpage = maxpage;
 	m->frame = 0;
 	m->n = 0;
 	m->marked_page = 0;
 	m->freelist = NULL;
-	m->marked[0] = NULL;
-	m->count[0] = NULL;
-	m->transient[0] = NULL;
-	m->constant[0] = NULL;
+	m->p = (struct pages *)malloc(sizeof(struct pages) * maxpage);
+	memset(&m->p[0], 0, sizeof(struct pages));
 	m->marked_n = 0;
 	m->constant_n = 0;
 	math_unmarked_init(&m->unmarked);
@@ -100,31 +106,33 @@ math_delete(struct math_context *M) {
 	if (M == NULL)
 		return;
 	int i;
-	for (i=0;i<MAX_PAGE;i++) {
-		if (M->constant[i] == NULL) {
+	int maxpage = M->maxpage;
+	for (i=0;i<maxpage;i++) {
+		if (M->p[i].constant == NULL) {
 			break;
 		}
-		free(M->constant[i]);
+		free(M->p[i].constant);
 	}
-	for (i=0;i<MAX_PAGE;i++) {
-		if (M->transient[i] == NULL) {
+	for (i=0;i<maxpage;i++) {
+		if (M->p[i].transient == NULL) {
 			break;
 		}
-		free(M->transient[i]);
+		free(M->p[i].transient);
 	}
-	for (i=0;i<MAX_PAGE;i++) {
-		if (M->marked[i] == NULL) {
+	for (i=0;i<maxpage;i++) {
+		if (M->p[i].marked == NULL) {
 			break;
 		}
-		free(M->marked[i]);
+		free(M->p[i].marked);
 	}
-	for (i=0;i<MAX_PAGE;i++) {
-		if (M->count[i] == NULL) {
+	for (i=0;i<maxpage;i++) {
+		if (M->p[i].count == NULL) {
 			break;
 		}
-		free(M->count[i]);
+		free(M->p[i].count);
 	}
 	math_unmarked_deinit(&M->unmarked);
+	free(M->p);
 	free(M);
 }
 
@@ -132,26 +140,28 @@ size_t
 math_memsize(struct math_context *M) {
 	size_t sz = sizeof(*M);
 	int i;
-	for (i=0;i<MAX_PAGE;i++) {
-		if (M->constant[i] == NULL) {
+	int maxpage = M->maxpage;
+	sz += sizeof(struct pages *) * maxpage;
+	for (i=0;i<maxpage;i++) {
+		if (M->p[i].constant == NULL) {
 			break;
 		}
 		sz += sizeof(struct page);
 	}
-	for (i=0;i<MAX_PAGE;i++) {
-		if (M->transient[i] == NULL) {
+	for (i=0;i<maxpage;i++) {
+		if (M->p[i].transient == NULL) {
 			break;
 		}
 		sz += sizeof(struct page);
 	}
-	for (i=0;i<MAX_PAGE;i++) {
-		if (M->marked[i] == NULL) {
+	for (i=0;i<maxpage;i++) {
+		if (M->p[i].marked == NULL) {
 			break;
 		}
 		sz += sizeof(struct page);
 	}
-	for (i=0;i<MAX_PAGE;i++) {
-		if (M->count[i] == NULL) {
+	for (i=0;i<maxpage;i++) {
+		if (M->p[i].count == NULL) {
 			break;
 		}
 		sz += sizeof(struct marked_count);
@@ -164,20 +174,21 @@ static void *
 allocvec(struct math_context *M, int size, int *index) {
 	int page_id = M->n / PAGE_SIZE;
 	int next_page_id = (M->n + size - 1) / PAGE_SIZE;
+	int maxpage = M->maxpage;
 	if (next_page_id != page_id) {
-		assert(next_page_id < MAX_PAGE);
+		assert(next_page_id < maxpage);
 		page_id = next_page_id;
 		M->n = page_id * PAGE_SIZE;
 	}
-	if (M->transient[page_id] == NULL) {
-		M->transient[page_id] = (struct page *)malloc(sizeof(struct page));
-		if (page_id + 1 < MAX_PAGE) {
-			M->transient[page_id+1] = NULL;
+	if (M->p[page_id].transient == NULL) {
+		M->p[page_id].transient = (struct page *)malloc(sizeof(struct page));
+		if (page_id + 1 < maxpage) {
+			M->p[page_id+1].transient = NULL;
 		}
 	}
 	*index = M->n;
 	M->n += size;
-	return M->transient[page_id]->v[*index % PAGE_SIZE];
+	return M->p[page_id].transient->v[*index % PAGE_SIZE];
 }
 
 static inline int
@@ -244,7 +255,7 @@ float *
 get_transient(struct math_context *M, int index) {
 	assert(index < M->n);
 	int page_id = index / PAGE_SIZE;
-	return M->transient[page_id]->v[index % PAGE_SIZE];
+	return M->p[page_id].transient->v[index % PAGE_SIZE];
 }
 
 float *
@@ -302,7 +313,7 @@ math_marked(struct math_context *M, math_t id) {
 	index %= PAGE_SIZE;
 	if (page_id >= M->marked_page)
 		return 0;
-	return M->count[page_id]->count[index] > 0;
+	return M->p[page_id].count->count[index] > 0;
 }
 
 static float *
@@ -310,7 +321,7 @@ get_marked(struct math_context *M, int index) {
 	int page_id = index / PAGE_SIZE;
 	index %= PAGE_SIZE;
 	assert (page_id < M->marked_page);
-	return M->marked[page_id]->v[index];
+	return M->p[page_id].marked->v[index];
 }
 
 static inline const float *
@@ -318,7 +329,7 @@ get_constant(struct math_context *M, int index) {
 	assert(index < M->constant_n);
 	int page_id = index / PAGE_SIZE;
 	index %= PAGE_SIZE;
-	return M->constant[page_id]->v[index];
+	return M->p[page_id].constant->v[index];
 }
 
 math_t
@@ -416,19 +427,20 @@ math_init(struct math_context *M, math_t id) {
 
 static struct marked_freelist *
 new_marked_page(struct math_context *M) {
-	assert (M->marked_page < MAX_PAGE);
+	int maxpage = M->maxpage;
+	assert (M->marked_page < maxpage);
 	int page = M->marked_page++;
-	if (M->marked_page < MAX_PAGE) {
-		M->marked[M->marked_page] = NULL;
-		M->count[M->marked_page] = NULL;
+	if (M->marked_page < maxpage) {
+		M->p[M->marked_page].marked = NULL;
+		M->p[M->marked_page].count = NULL;
 	}
-	assert(M->marked[page] == NULL);
-	M->marked[page] = (struct page *)malloc(sizeof(struct page));
-	assert(M->count[page] == NULL);
-	M->count[page] = (struct marked_count *)malloc(sizeof(struct marked_count));
-	memset(M->count[page], 0, sizeof(struct marked_count));
+	assert(M->p[page].marked == NULL);
+	M->p[page].marked = (struct page *)malloc(sizeof(struct page));
+	assert(M->p[page].count == NULL);
+	M->p[page].count = (struct marked_count *)malloc(sizeof(struct marked_count));
+	memset(M->p[page].count, 0, sizeof(struct marked_count));
 
-	struct marked_freelist *node = (struct marked_freelist *)M->marked[page];
+	struct marked_freelist *node = (struct marked_freelist *)M->p[page].marked;
 	node->next = M->freelist;
 	node->page = page;
 	node->size = PAGE_SIZE;
@@ -464,18 +476,19 @@ alloc_vecarray(struct math_context *M, int vecsize) {
 			break;
 		}
 	}
-	struct page *p = M->marked[page_id];
+	struct page *p = M->p[page_id].marked;
 	int index = (int)((mem - &p->v[0][0]) / 4);
 	return index + page_id * PAGE_SIZE;
 }
 
 static void
 prepare_constant_page(struct math_context *M, int page) {
-	assert(page < MAX_PAGE);
-	if (M->constant[page] == NULL) {
-		M->constant[page] = (struct page *)malloc(sizeof(struct page));
-		if (page + 1 < MAX_PAGE) {
-			M->constant[page+1] = NULL;
+	int maxpage = M->maxpage;
+	assert(page < maxpage);
+	if (M->p[page].constant == NULL) {
+		M->p[page].constant = (struct page *)malloc(sizeof(struct page));
+		if (page + 1 < maxpage) {
+			M->p[page+1].constant = NULL;
 		}
 	}
 }
@@ -502,7 +515,7 @@ alloc_constant(struct math_context *M, const float *v, int n) {
 	} else {
 		M->constant_n += n;
 	}
-	memcpy(M->constant[page_id]->v[index], v, n * 4 * sizeof(float));
+	memcpy(M->p[page_id].constant->v[index], v, n * 4 * sizeof(float));
 
 	return M->constant_n - n;
 }
@@ -583,7 +596,7 @@ alloc_marked(struct math_context *M, const float *v, int type, int size) {
 
 	int page_id = index / PAGE_SIZE;
 	index %= PAGE_SIZE;
-	M->count[page_id]->count[index] = 1;
+	M->p[page_id].count->count[index] = 1;
 
 	return u.id;
 }
@@ -600,14 +613,14 @@ get_marked_id(struct math_context *M, math_t id) {
 	int page_id = index / PAGE_SIZE;
 	index %= PAGE_SIZE;
 	assert (page_id < M->marked_page);
-	int count = M->count[page_id]->count[index];
+	int count = M->p[page_id].count->count[index];
 	if (count == 255) {
 		const float *v = math_value(M, id);
 		int size = math_size(M, id);
 		return alloc_marked(M, v, u.s.type, size);
 	} else {
 		// add reference count
-		++M->count[page_id]->count[index];
+		++M->p[page_id].count->count[index];
 		return id;
 	}
 }
@@ -687,7 +700,7 @@ math_unmark(struct math_context *M, math_t id) {
 		vecsize *= 4;
 	}
 	assert(vecsize + index <= PAGE_SIZE);
-	uint8_t * count = &M->count[page_id]->count[index];
+	uint8_t * count = &M->p[page_id].count->count[index];
 	int c = *count;
 	assert(c > 0);
 	if (c == 1) {
@@ -716,7 +729,7 @@ math_premark(struct math_context *M, int type, int size) {
 		vecsize *= 4;
 	}
 	assert(vecsize + index <= PAGE_SIZE);
-	M->count[page_id]->count[index] = 0;
+	M->p[page_id].count->count[index] = 0;
 	math_unmarked_insert(&M->unmarked, u.s);
 	return u.id;
 }
@@ -765,7 +778,7 @@ free_unmarked(struct math_context *M) {
 	int sz;
 	int last = math_unmark_index_(M->unmarked.index[0], &sz);
 	int page_id = last / PAGE_SIZE;
-	if (M->count[page_id]->count[last % PAGE_SIZE] == 0) {
+	if (M->p[page_id].count->count[last % PAGE_SIZE] == 0) {
 		++p;
 	}
 	for (i=1;i<n;i++) {
@@ -773,7 +786,7 @@ free_unmarked(struct math_context *M) {
 		if (current != last) {
 			last = current;
 			page_id = current / PAGE_SIZE;
-			if (M->count[page_id]->count[current % PAGE_SIZE] == 0) {
+			if (M->p[page_id].count->count[current % PAGE_SIZE] == 0) {
 				M->unmarked.index[p++] = M->unmarked.index[i];
 			}
 		}
@@ -808,11 +821,11 @@ math_frame(struct math_context *M) {
 		M->frame = 0;
 	}
 	int i;
-	for (i=(M->n / PAGE_SIZE) + 1; i < MAX_PAGE; i ++) {
-		if (M->transient[i] == NULL)
+	for (i=(M->n / PAGE_SIZE) + 1; i < M->maxpage; i ++) {
+		if (M->p[i].transient == NULL)
 			break;
-		free(M->transient[i]);
-		M->transient[i] = NULL;
+		free(M->p[i].transient);
+		M->p[i].transient = NULL;
 	}
 	free_unmarked(M);
 	M->n = 0;
@@ -878,7 +891,7 @@ math_print(struct math_context *M, math_t id) {
 			int index = u.s.index;
 			int page = index / PAGE_SIZE;
 			index %= PAGE_SIZE;
-			int c = M->count[page]->count[index];
+			int c = M->p[page].count->count[index];
 			printf("/%d) :", c);
 		}
 	}
@@ -907,7 +920,7 @@ math_print(struct math_context *M, math_t id) {
 
 int
 main() {
-	struct math_context *M = math_new();
+	struct math_context *M = math_new(0);
 	float v[4] = { 1,2,3,4 };
 	float array[3][4] = {
 		{ 1, 0, 0, 0 },

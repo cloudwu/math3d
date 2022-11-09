@@ -1,3 +1,5 @@
+debug.getregistry().MATH3D_MAXPAGE = 1024
+
 local math3d = require "math3d"
 
 do
