@@ -60,9 +60,9 @@ math_quat(struct math_context *ctx, const float *v) {
 }
 
 struct math_id {
-	uint32_t index		: 20;
+	uint32_t frame		: 20;
 	uint32_t size		: 12;	// array size - 1 (0 : single object), for ref type, it's index
-	uint32_t frame      : 28;
+	uint32_t index      : 28;
 	uint32_t type       : 3;
 	uint32_t transient  : 1;	// 0: persisent
 };
