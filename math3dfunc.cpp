@@ -119,6 +119,17 @@ VEC3(struct math_context *M, math_t v3) {
 }
 
 math_t
+math3d_matrix_from_cols(struct math_context* M, math_t c1, math_t c2, math_t c3, math_t c4){
+	math_t r;
+	glm::mat4x4 &m = allocmat(M, &r);
+	m[0] = VEC(M, c1);
+	m[1] = VEC(M, c2);
+	m[2] = VEC(M, c3);
+	m[3] = VEC(M, c4);
+	return r;
+}
+
+math_t
 math3d_quat_to_matrix(struct math_context *M, math_t quat) {
 	math_t r;
 	glm::mat4x4 &m = allocmat(M, &r);
