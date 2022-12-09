@@ -816,12 +816,29 @@ static int
 lmatrix(lua_State *L) {
 	if (lua_isuserdata(L, 1)) {
 		struct math_context *M = GETMC(L);
-		math_t id = get_id(L, M, 1);
-		int type = math_type(M, id);
-		if (type == MATH_TYPE_QUAT) {
+
+		const int n = lua_gettop(L);
+		if (n == 1){
+			math_t id = get_id(L, M, 1);
+			int type = math_type(M, id);
+			if (type != MATH_TYPE_QUAT) {
+				return luaL_error(L, "create matrix with 1 argument, this argument must be 'quaternion', but %s is provided", math_typename(type));
+			}
 			id = math3d_quat_to_matrix(M, id);
 			lua_pushmath(L, id);
 			return 1;
+		} else if (n == 4){
+			lua_pushmath(L,
+				math3d_matrix_from_cols(M, 
+					vector_from_index(L, M, 1),
+					vector_from_index(L, M, 2),
+					vector_from_index(L, M, 3),
+					vector_from_index(L, M, 4))
+			);
+
+			return 1;
+		} else {
+			return luaL_error(L, "Incorrect argument number:%d, 1 argument with quaternion or 4 arguments with vectors is valid");
 		}
 	}
 	return new_object(L, MATH_TYPE_MAT, matrix_from_table, 16);
@@ -2391,7 +2408,7 @@ luaopen_math3d(lua_State *L) {
 	int refmeta = lua_gettop(L);
 	int maxpage = 0;
 	if (lua_getfield(L, LUA_REGISTRYINDEX, "MATH3D_MAXPAGE") == LUA_TNUMBER) {
-		maxpage = lua_tointeger(L, -1);
+		maxpage = (int)lua_tointeger(L, -1);
 	}
 	lua_pop(L, 1);
 
