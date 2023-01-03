@@ -175,8 +175,8 @@ allocvec(struct math_context *M, int size, int *index) {
 	int page_id = M->n / PAGE_SIZE;
 	int next_page_id = (M->n + size - 1) / PAGE_SIZE;
 	int maxpage = M->maxpage;
+	assert(next_page_id < maxpage);	// page_id overflow check
 	if (next_page_id != page_id) {
-		assert(next_page_id < maxpage);
 		page_id = next_page_id;
 		M->n = page_id * PAGE_SIZE;
 	}
