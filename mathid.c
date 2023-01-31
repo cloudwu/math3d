@@ -94,7 +94,7 @@ math_new(int maxpage) {
 	m->marked_page = 0;
 	m->freelist = NULL;
 	m->p = (struct pages *)malloc(sizeof(struct pages) * maxpage);
-	memset(&m->p[0], 0, sizeof(struct pages));
+	memset(m->p, 0, sizeof(struct pages) * maxpage);
 	m->marked_n = 0;
 	m->constant_n = 0;
 	math_unmarked_init(&m->unmarked);
