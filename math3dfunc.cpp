@@ -401,7 +401,7 @@ math3d_floor(struct math_context *M, math_t v) {
 	vv[0] = floor(value[0]);
 	vv[1] = floor(value[1]);
 	vv[2] = floor(value[2]);
-	vv[3] = 0;
+	vv[3] = floor(value[3]);
 	return id;
 }
 
@@ -414,7 +414,7 @@ math3d_ceil(struct math_context *M, math_t v) {
 	vv[0] = ceil(value[0]);
 	vv[1] = ceil(value[1]);
 	vv[2] = ceil(value[2]);
-	vv[3] = 0;
+	vv[3] = ceil(value[3]);
 	return id;
 }
 
