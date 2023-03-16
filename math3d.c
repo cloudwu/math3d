@@ -1781,7 +1781,7 @@ laabb_intersect_plane(lua_State *L) {
 static int
 laabb_intersection(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	math_t r = math3d_aabb_intersection(M, matrix_from_index(L, M, 1), matrix_from_index(L, M, 2));
+	math_t r = math3d_aabb_intersection(M, aabb_from_index(L, M, 1), aabb_from_index(L, M, 2));
 	lua_pushmath(L, r);
 	return 1;
 }
