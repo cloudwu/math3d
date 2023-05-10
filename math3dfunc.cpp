@@ -739,18 +739,18 @@ math3d_aabb_merge(struct math_context *M, math_t aabblhs, math_t aabbrhs) {
 	check_type(M, aabblhs, MATH_TYPE_VEC4);
 	check_type(M, aabbrhs, MATH_TYPE_VEC4);
 
-	math_t v[4] = {
-		math_index(M, aabblhs, 0),
-		math_index(M, aabblhs, 1),
-		math_index(M, aabbrhs, 0),
-		math_index(M, aabbrhs, 1),
-	};
-	math_t min_id = minv(M, v[0], v[2]);
-	math_t max_id = maxv(M, v[1], v[3]);
-	if (math_issame(min_id, v[0]) && math_issame(max_id, v[1])) {
+	const math_t lhsmin = math_index(M, aabblhs, 0);
+	const math_t lhsmax = math_index(M, aabblhs, 1);
+	
+	const math_t rhsmin = math_index(M, aabbrhs, 0);
+	const math_t rhsmax = math_index(M, aabbrhs, 1);
+
+	math_t min_id = minv(M, lhsmin, rhsmin);
+	math_t max_id = maxv(M, lhsmax, rhsmax);
+	if (math_issame(min_id, lhsmin) && math_issame(max_id, lhsmax)) {
 		return aabblhs;
 	}
-	if (math_issame(min_id, v[2]) && math_issame(max_id, v[3])) {
+	if (math_issame(min_id, rhsmin) && math_issame(max_id, rhsmax)) {
 		return aabbrhs;
 	}
 	math_t r = math_import(M, NULL, MATH_TYPE_VEC4, 2);
