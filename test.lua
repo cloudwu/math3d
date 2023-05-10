@@ -65,7 +65,7 @@ do
 	ref2.v = math3d.vector(1,2,3,4)
 
 	print("ref1", ref1)
-	print("ref1 value", math3d.tostring(math3d.matrix(ref1)))
+	print("ref1 value", math3d.tostring(ref1))
 	print(ref2)
 	print("ref2 value", math3d.tostring(math3d.vector(ref2)))
 	ref2.v = math3d.pack("dddd", 1,2,3,4)
@@ -331,6 +331,29 @@ do
 
 	print("minmax-aabb:", math3d.tostring(aabb))
 	print("aabb-append:", math3d.tostring(aabb2))
+
+	--aabb test merge
+	local aabb = math3d.aabb()
+	assert(not math3d.aabb_isvalid(aabb))
+
+	local aabb2 = math3d.aabb(math3d.vector(0.0, 0.0, 0.0), math3d.vector(-1.0, 2.0, 3.0))
+	assert(math3d.aabb_isvalid(aabb2))
+
+	local mergeaabb = math3d.aabb_merge(aabb, aabb2)
+	assert(math3d.aabb_isvalid(mergeaabb))
+
+	assert(math3d.isequal(math3d.vector(-1.0, 0.0, 0.0), math3d.array_index(mergeaabb, 1)))
+	assert(math3d.isequal(math3d.vector(0.0, 2.0, 3.0), math3d.array_index(mergeaabb, 2)))
+	
+
+	aabb = math3d.aabb(math3d.vector(-2.0, -3.0, -5.0), math3d.vector(1.0, 2.0, 3.0))
+	aabb2 = math3d.aabb(math3d.vector(-20.0, 31.0, 5.0), math3d.vector(1.0, 32.0, 36.0))
+
+	mergeaabb = math3d.aabb_merge(aabb, aabb2)
+
+	assert(math3d.isequal(math3d.vector(-20.0, -3.0, -5.0), math3d.array_index(mergeaabb, 1)))
+	assert(math3d.isequal(math3d.vector(1.0, 32.0, 36.0), math3d.array_index(mergeaabb, 2)))
+
 end
 
 local r2l_mat = math3d.matrix{s={-1.0, 1.0, 1.0}}
