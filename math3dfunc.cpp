@@ -1168,7 +1168,7 @@ math3d_frustum_planes(struct math_context *M, math_t m, int homogeneous_depth) {
 int
 math3d_frustum_intersect_aabb(struct math_context *M, math_t planes, math_t aabb) {
 	int ii;
-
+	int r = 1;
 	check_type(M, aabb, MATH_TYPE_VEC4);
 
 	const glm::vec3 &min =  VEC3(M, math_index(M, aabb, 0));
@@ -1176,15 +1176,17 @@ math3d_frustum_intersect_aabb(struct math_context *M, math_t planes, math_t aabb
 
 	for (ii = 0; ii < 6; ++ii){
 		const auto &p = VEC(M, math_index(M, planes, ii));
-		const int r = plane_intersect(p, min, max);
-		// intersect or outside frustum
-		if (r <= 0){
+		int t = plane_intersect(p, min, max);
+		r = t < r ? t : r;
+		// r = -1, aabb outside one plane, means outside frustum
+		if (r < 0){
 			return r;
 		}
 	}
 
-	// aabb in front of all planes, mean inside frustum
-	return 1;
+	// r = 1, aabb in front of all planes, mean inside frustum
+	// r = 0, aabb in front of part planes or aabb intersect with part planes, mean intersect frustum
+	return r;
 }
 
 // point: [
