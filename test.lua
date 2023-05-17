@@ -49,6 +49,15 @@ do
 	print(vec, math3d.tostring(vec))
 end
 
+do
+	print "---- serialize ----"
+	local c = math3d.matrix { s = 1 }
+	local s = math3d.serialize(c)
+	local c2 = math3d.matrix(s)
+	print(math3d.tostring(c))
+	print(math3d.tostring(c2))
+end
+
 local ref1, ref2, ref3
 
 do
@@ -344,7 +353,7 @@ do
 
 	assert(math3d.isequal(math3d.vector(-1.0, 0.0, 0.0), math3d.array_index(mergeaabb, 1)))
 	assert(math3d.isequal(math3d.vector(0.0, 2.0, 3.0), math3d.array_index(mergeaabb, 2)))
-	
+
 
 	aabb = math3d.aabb(math3d.vector(-2.0, -3.0, -5.0), math3d.vector(1.0, 2.0, 3.0))
 	aabb2 = math3d.aabb(math3d.vector(-20.0, 31.0, 5.0), math3d.vector(1.0, 32.0, 36.0))
@@ -430,6 +439,8 @@ do
 		math3d.vector ( 42, 0 , 0 ),
 	}
 	print(math3d.tostring(array))
+	local arrays = math3d.serialize(array)
+	array = math3d.array_vector(arrays)
 	assert(math3d.array_size(array) == 2)
 	print(math3d.tostring(math3d.array_index(array, 1)))
 

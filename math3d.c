@@ -630,6 +630,33 @@ ltostring(lua_State *L) {
 }
 
 static int
+serialize_id(lua_State *L, struct math_context *M, math_t id) {
+	const float * v = math_value(M, id);
+	int type = math_type(M, id);
+	int size = math_size(M, id);
+	switch (type) {
+		case MATH_TYPE_QUAT:
+		case MATH_TYPE_VEC4:
+			size *= 4;
+			break;
+		case MATH_TYPE_MAT:
+			size *= 16;
+			break;
+		default:
+			return luaL_error(L, "Invalid math type %d", type);
+	}
+	lua_pushlstring(L, (const char *)v, size * sizeof(float));
+	return 1;
+}
+
+static int
+lserialize(lua_State *L) {
+	struct math_context *M = GETMC(L);
+	math_t id = get_id(L, M, 1);
+	return serialize_id(L, M, id);
+}
+
+static int
 lref_gc(lua_State *L) {
 	struct refobject *R = lua_touserdata(L, 1);
 	unmark_check(GETMC(L), R->id);
@@ -639,6 +666,13 @@ lref_gc(lua_State *L) {
 
 static math_t
 new_object_(lua_State *L, int type, from_table_func from_table, int narray) {
+	if (lua_type(L, 1) == LUA_TSTRING) {
+		size_t sz;
+		const float * v = (const float *)lua_tolstring(L, 1, &sz);
+		if (sz != narray * sizeof(float))
+			luaL_error(L, "Invalid serialize size (%s)", math_typename(type));
+		return math_import(GETMC(L), v, type, 1);
+	}
 	int argn = lua_gettop(L);
 	math_t id;
 	if (argn == narray) {
@@ -753,22 +787,32 @@ create_array(lua_State *L, struct math_context *M, int array_index, int type, in
 }
 
 static inline math_t
-array_from_index(lua_State *L, struct math_context *M, int index, int type, int expsize) {
+array_from_index(lua_State *L, struct math_context *M, int index, int type) {
 	if (lua_isuserdata(L, index)) {
 		math_t id = get_id(L, M, index);
 		if (math_type(M, id) != type) {
 			luaL_error(L, "Type mismatch %s != %s", math_typename(type), math_typename(math_type(M, id)));
 		}
-		if (expsize != 0 && math_size(M, id) != expsize) {
-			luaL_error(L, "Size mismatch %d != %d", expsize, math_size(M, id));
-		}
 		return id;
+	} else if (lua_type(L, index) == LUA_TSTRING) {
+		size_t sz;
+		const float *v = (const float *)lua_tolstring(L, index, &sz);
+		sz /= sizeof(float);
+		switch (type) {
+		case MATH_TYPE_VEC4:
+		case MATH_TYPE_QUAT:
+			sz /= 4;
+			break;
+		case MATH_TYPE_MAT:
+			sz /= 16;
+			break;
+		default:
+			luaL_error(L, "Unsupported array type %s", math_typename(type));
+		}
+		return math_import(M, v, type, sz);
 	}
 	luaL_checktype(L, index, LUA_TTABLE);
 	int n = (int)lua_rawlen(L, index);
-	if (expsize != 0 && expsize != n) {
-		luaL_error(L, "Need size of table %d/%d", expsize, n);
-	}
 
 	from_index func;
 	int esize;
@@ -916,7 +960,7 @@ static int
 lmul_array(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	math_t m = matrix_from_index(L, M, 1);
-	math_t array = array_from_index(L, M, 2, MATH_TYPE_MAT, 0);
+	math_t array = array_from_index(L, M, 2, MATH_TYPE_MAT);
 	math_t output = MATH_NULL;
 	if (!lua_isnoneornil(L, 3)) {
 		output = get_id(L, M, 3);
@@ -935,21 +979,21 @@ lmul_array(lua_State *L) {
 static int
 larray_vector(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	lua_pushmath(L, array_from_index(L, M, 1, MATH_TYPE_VEC4, 0));
+	lua_pushmath(L, array_from_index(L, M, 1, MATH_TYPE_VEC4));
 	return 1;
 }
 
 static int
 larray_matrix(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	lua_pushmath(L, array_from_index(L, M, 1, MATH_TYPE_MAT, 0));
+	lua_pushmath(L, array_from_index(L, M, 1, MATH_TYPE_MAT));
 	return 1;
 }
 
 static int
 larray_quat(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	lua_pushmath(L, array_from_index(L, M, 1, MATH_TYPE_QUAT, 0));
+	lua_pushmath(L, array_from_index(L, M, 1, MATH_TYPE_QUAT));
 	return 1;
 }
 
@@ -1417,7 +1461,7 @@ static int
 lminmax(lua_State *L) {
 	struct math_context *M = GETMC(L);
 
-	const math_t points = array_from_index(L, M, 1, MATH_TYPE_VEC4, 0);
+	const math_t points = array_from_index(L, M, 1, MATH_TYPE_VEC4);
 
 	const math_t transform = object_from_index(L, M, 2, MATH_TYPE_MAT, matrix_from_table);	// can be null
 	math_t minmax[2] = { MATH_NULL, MATH_NULL };
@@ -2249,7 +2293,7 @@ lconstant_array(lua_State *L) {
 	}
 
 	struct math_context * M = GETMC(L);
-	math_t id = array_from_index(L, M, 2, type, 0);
+	math_t id = array_from_index(L, M, 2, type);
 	lua_pushmath(L, math_constant(M, id));
 	return 1;
 }
@@ -2263,6 +2307,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "constant", lconstant },
 		{ "constant_array", lconstant_array },
 		{ "tostring", ltostring },
+		{ "serialize", lserialize },
 		{ "matrix", lmatrix },
 		{ "vector", lvector },
 		{ "quaternion", lquaternion },
