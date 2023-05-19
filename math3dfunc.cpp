@@ -111,11 +111,46 @@ VEC(struct math_context *M, math_t v4) {
 	return *(const glm::vec4 *)(v);
 }
 
+static inline const glm::vec4 &
+VECPTR(const float *v) {
+	return *(const glm::vec4 *)(v);
+}
+
 static inline const glm::vec3 &
 VEC3(struct math_context *M, math_t v3) {
 	check_type(M, v3, MATH_TYPE_VEC4);
 	const float *v = math_value(M, v3);
 	return *(const glm::vec3 *)(v);
+}
+
+struct AABB {
+	const glm::vec4 &minv;
+	const glm::vec4 &maxv;
+};
+
+static inline struct AABB
+AABB(struct math_context *M, math_t aabb) {
+	check_type(M, aabb, MATH_TYPE_VEC4);
+	const float *v = math_value(M, aabb);
+	return {
+		*(const glm::vec4 *)(v),
+		*(const glm::vec4 *)(v+4)
+	};
+}
+
+struct AABB_buffer {
+	glm::vec4 &minv;
+	glm::vec4 &maxv;
+};
+
+static inline struct AABB_buffer
+initaabb(struct math_context *M, math_t id) {
+	check_type(M, id, MATH_TYPE_VEC4);
+	float * buf = math_init(M, id);
+	return {
+		*(glm::vec4 *)buf,
+		*(glm::vec4 *)(buf+4),
+	};
 }
 
 math_t
@@ -889,17 +924,18 @@ math_t
 math3d_frusutm_aabb(struct math_context *M, math_t points) {
 	math_t aabb = math_import(M, NULL, MATH_TYPE_VEC4, 2);
 
-	glm::vec4 & minv = initvec4(M, math_index(M, aabb, 0));
-	glm::vec4 & maxv = initvec4(M, math_index(M, aabb, 1));
+	auto t = initaabb(M, aabb);
 	
-	minv = glm::vec4(std::numeric_limits<float>::max()), 
-	maxv = glm::vec4(std::numeric_limits<float>::lowest());
+	t.minv = glm::vec4(std::numeric_limits<float>::max()),
+	t.maxv = glm::vec4(std::numeric_limits<float>::lowest());
+
+	const float * points_v = math_value(M, points);
 
 	int ii = 0;
 	for (ii = 0; ii < 8; ++ii){
-		const auto &p = VEC(M, math_index(M, points, ii));
-		minv = glm::min(minv, p);
-		maxv = glm::max(maxv, p);
+		const auto &p = VECPTR(points_v + ii * 4);
+		t.minv = glm::min(t.minv, p);
+		t.maxv = glm::max(t.maxv, p);
 	}
 
 	return aabb;
@@ -907,40 +943,37 @@ math3d_frusutm_aabb(struct math_context *M, math_t points) {
 
 int
 math3d_aabb_isvalid(struct math_context *M, math_t aabb) {
-	const glm::vec3 &minv = VEC3(M, math_index(M, aabb, 0));
-	const glm::vec3 &maxv = VEC3(M, math_index(M, aabb, 1));
+	auto t = AABB(M, aabb);
 
-	return (minv.x < maxv.x && minv.y < maxv.y && minv.z < maxv.z) ? 1 : 0;
+	return (t.minv.x < t.maxv.x && t.minv.y < t.maxv.y && t.minv.z < t.maxv.z) ? 1 : 0;
 }
 
 math_t
 math3d_aabb_transform(struct math_context *M, math_t trans, math_t aabb) {
 	const auto& t = MAT(M, trans);
 
-	const auto& minv = VEC(M, math_index(M, aabb, 0));
-	const auto& maxv = VEC(M, math_index(M, aabb, 1));
+	auto a = AABB(M, aabb);
 
 	const glm::vec4 &right	= t[0];
 	const glm::vec4 &up 	= t[1];
 	const glm::vec4 &forward= t[2];
 	const glm::vec4 &pos 	= t[3];
 
-	const glm::vec4 xa = right * minv.x;
-	const glm::vec4 xb = right * maxv.x;
+	const glm::vec4 xa = right * a.minv.x;
+	const glm::vec4 xb = right * a.maxv.x;
 
-	const glm::vec4 ya = up * minv.y;
-	const glm::vec4 yb = up * maxv.y;
+	const glm::vec4 ya = up * a.minv.y;
+	const glm::vec4 yb = up * a.maxv.y;
 
-	const glm::vec4 za = forward * minv.z;
-	const glm::vec4 zb = forward * maxv.z;
+	const glm::vec4 za = forward * a.minv.z;
+	const glm::vec4 zb = forward * a.maxv.z;
 
 	math_t r = math_import(M, NULL, MATH_TYPE_VEC4, 2);
 
-	auto &rmin = initvec4(M, math_index(M, r, 0));
-	auto &rmax = initvec4(M, math_index(M, r, 1));
+	auto o = initaabb(M, r);
 
-	rmin = glm::min(xa, xb) + glm::min(ya, yb) + glm::min(za, zb) + pos;
-	rmax = glm::max(xa, xb) + glm::max(ya, yb) + glm::max(za, zb) + pos;
+	o.minv = glm::min(xa, xb) + glm::min(ya, yb) + glm::min(za, zb) + pos;
+	o.maxv = glm::max(xa, xb) + glm::max(ya, yb) + glm::max(za, zb) + pos;
 
 	return r;
 }
@@ -949,20 +982,17 @@ math_t
 math3d_aabb_center_extents(struct math_context *M, math_t aabb) {
 	math_t result = math_import(M, NULL, MATH_TYPE_VEC4, 2);
 
-	const glm::vec4 &minv = VEC(M, math_index(M, aabb, 0));
-	const glm::vec4 &maxv = VEC(M, math_index(M, aabb, 1));
+	auto t = AABB(M, aabb);
+	auto center = initaabb(M, result);
 
-	glm::vec4 &center = initvec4(M, math_index(M, result, 0));
-	glm::vec4 &extents = initvec4(M, math_index(M, result, 1));
-
-	center = (maxv+minv)*0.5f;
-	extents = (maxv-minv)*0.5f;
+	center.minv = (t.maxv+t.minv)*0.5f;
+	center.maxv = (t.maxv-t.minv)*0.5f;
 
 	return result;
 }
 
 static int
-plane_intersect(const glm::vec4& plane, const glm::vec3 &min, const glm::vec3 &max) {
+plane_intersect(const glm::vec4& plane, const glm::vec4 &min, const glm::vec4 &max) {
 	float minD, maxD;
 	if (plane.x > 0.0f) {
 		minD = plane.x * min.x;
@@ -1007,10 +1037,11 @@ plane_intersect(const glm::vec4& plane, const glm::vec3 &min, const glm::vec3 &m
 
 int
 math3d_aabb_intersect_plane(struct math_context *M, math_t aabb, math_t plane) {
+	auto t = AABB(M, aabb);
 	return plane_intersect(
 		VEC(M, plane),
-		VEC3(M, math_index(M, aabb, 0)),
-		VEC3(M, math_index(M, aabb, 1))
+		t.minv,
+		t.maxv
 	);
 }
 
@@ -1059,35 +1090,34 @@ math3d_aabb_test_point(struct math_context *M, math_t aabb, math_t v) {
 
 void
 math3d_aabb_points(struct math_context *M, math_t aabb, math_t points[8]) {
-	const auto &minv = VEC(M, math_index(M, aabb, 0));
-	const auto &maxv = VEC(M, math_index(M, aabb, 1));
+	auto t = AABB(M, aabb);
 
 	int i;
 	for (i=0;i<8;i++) {
 		points[i] = math_vec4(M, NULL);
 	}
 
-	glm::vec4 &p0 = initvec4(M, points[0]); p0 = minv;
-	glm::vec4 &p1 = initvec4(M, points[1]); p1 = glm::vec4(minv.x, maxv.y, minv.z, 0);
-	glm::vec4 &p2 = initvec4(M, points[2]); p2 = glm::vec4(maxv.x, minv.y, minv.z, 0);
-	glm::vec4 &p3 = initvec4(M, points[3]); p3 = glm::vec4(maxv.x, maxv.y, minv.z, 0);
+	glm::vec4 &p0 = initvec4(M, points[0]); p0 = t.minv;
+	glm::vec4 &p1 = initvec4(M, points[1]); p1 = glm::vec4(t.minv.x, t.maxv.y, t.minv.z, 0);
+	glm::vec4 &p2 = initvec4(M, points[2]); p2 = glm::vec4(t.maxv.x, t.minv.y, t.minv.z, 0);
+	glm::vec4 &p3 = initvec4(M, points[3]); p3 = glm::vec4(t.maxv.x, t.maxv.y, t.minv.z, 0);
 	                                  
-	glm::vec4 &p4 = initvec4(M, points[4]); p4 = glm::vec4(minv.x, minv.y, maxv.z, 0);
-	glm::vec4 &p5 = initvec4(M, points[5]); p5 = glm::vec4(minv.x, maxv.y, maxv.z, 0);
-	glm::vec4 &p6 = initvec4(M, points[6]); p6 = glm::vec4(maxv.x, minv.y, maxv.z, 0);
-	glm::vec4 &p7 = initvec4(M, points[7]); p7 = maxv;                                  
+	glm::vec4 &p4 = initvec4(M, points[4]); p4 = glm::vec4(t.minv.x, t.minv.y, t.maxv.z, 0);
+	glm::vec4 &p5 = initvec4(M, points[5]); p5 = glm::vec4(t.minv.x, t.maxv.y, t.maxv.z, 0);
+	glm::vec4 &p6 = initvec4(M, points[6]); p6 = glm::vec4(t.maxv.x, t.minv.y, t.maxv.z, 0);
+	glm::vec4 &p7 = initvec4(M, points[7]); p7 = t.maxv;
 }
 
 math_t
 math3d_aabb_expand(struct math_context *M, math_t aabb, math_t e) {
 	math_t r = math_import(M, NULL, MATH_TYPE_VEC4, 2);
-	glm::vec4 &min = initvec4(M, math_index(M, r, 0));
-	glm::vec4 &max = initvec4(M, math_index(M, r, 1));
+	auto o = initaabb(M, r);
+	auto t = AABB(M, aabb);
 
 	const glm::vec4 &v = VEC(M, e);
 
-	min = VEC(M, math_index(M, aabb, 0)) - v;
-	max = VEC(M, math_index(M, aabb, 1)) + v;
+	o.minv = t.minv - v;
+	o.maxv = t.maxv + v;
 
 	return r;
 }
@@ -1171,12 +1201,13 @@ math3d_frustum_intersect_aabb(struct math_context *M, math_t planes, math_t aabb
 	int r = 1;
 	check_type(M, aabb, MATH_TYPE_VEC4);
 
-	const glm::vec3 &min =  VEC3(M, math_index(M, aabb, 0));
-	const glm::vec3 &max =  VEC3(M, math_index(M, aabb, 1));
+	auto a = AABB(M, aabb);
+
+	const float * planes_v = math_value(M, planes);
 
 	for (ii = 0; ii < 6; ++ii){
-		const auto &p = VEC(M, math_index(M, planes, ii));
-		int t = plane_intersect(p, min, max);
+		const auto &p = VECPTR(planes_v + ii * 4);
+		int t = plane_intersect(p, a.minv, a.maxv);
 		r = t < r ? t : r;
 		// r = -1, aabb outside one plane, means outside frustum
 		if (r < 0){
