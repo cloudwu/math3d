@@ -16,8 +16,15 @@ static const math_t MATH_NULL = { 0 };
 #define MATH_TYPE_REF 4
 #define MATH_TYPE_COUNT 5
 
+#define MATH_INFO_MAXPAGE 0
+#define MATH_INFO_FRAME 1
+#define MATH_INFO_TRANSIENT 2
+#define MATH_INFO_MARKED 3
+#define MATH_INFO_CONSTANT 4
+
 struct math_context * math_new(int maxpage);
 void math_delete(struct math_context *);
+int math_info(struct math_context *, int what);
 size_t math_memsize(struct math_context *);
 void math_frame(struct math_context *);
 math_t math_import(struct math_context *, const float *v, int type, int size);

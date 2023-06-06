@@ -54,6 +54,24 @@ struct math_context {
 	int constant_n;
 };
 
+int
+math_info(struct math_context *M, int what) {
+	switch (what) {
+		case MATH_INFO_MAXPAGE:
+			return M->maxpage;
+		case MATH_INFO_FRAME:
+			return M->frame;
+		case MATH_INFO_TRANSIENT:
+			return M->n;
+		case MATH_INFO_MARKED:
+			return M->marked_n;
+		case MATH_INFO_CONSTANT:
+			return M->constant_n;
+		default:
+			return -1;
+	}
+}
+
 static inline int
 check_size(int size) {
 	struct math_id s;

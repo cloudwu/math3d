@@ -466,6 +466,8 @@ do
 	print(math3d.tostring(tmp))
 end
 
+print("N = ", math3d.info "transient")
+
 do
 	math3d.reset()
 	for i = 1, 4096 do

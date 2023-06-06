@@ -2298,9 +2298,36 @@ lconstant_array(lua_State *L) {
 	return 1;
 }
 
+static int
+linfo(lua_State *L) {
+	struct math_context * M = GETMC(L);
+	if (lua_type(L, 1) == LUA_TNUMBER) {
+		lua_pushinteger(L, math_info(M, lua_tointeger(L, 1)));
+		return 1;
+	}
+	const char *what = luaL_checkstring(L, 1);
+	int w = 0;
+	if (strcmp(what, "maxpage") == 0) {
+		w = MATH_INFO_MAXPAGE;
+	} else if (strcmp(what, "transient") == 0) {
+		w = MATH_INFO_TRANSIENT;
+	} else if (strcmp(what, "marked") == 0) {
+		w = MATH_INFO_MARKED;
+	} else if (strcmp(what, "constant") == 0) {
+		w = MATH_INFO_CONSTANT;
+	} else if (strcmp(what, "frame") == 0) {
+		w = MATH_INFO_FRAME;
+	} else {
+		return luaL_error(L, "Invalid info name : %s", what);
+	}
+	lua_pushinteger(L, math_info(M, w));
+	return 1;
+}
+
 static void
 init_math3d_api(lua_State *L, struct math3d_api *M) {
 	luaL_Reg l[] = {
+		{ "info", linfo },
 		{ "ref", NULL },
 		{ "mark", lmark },
 		{ "unmark", lunmark },
