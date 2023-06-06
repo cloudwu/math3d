@@ -11,8 +11,6 @@ struct math3d_api {
 	math_t (*from_lua_id)(lua_State *L, struct math_context *MC, int index);
 };
 
-#define MATH3D_CONTEXT "_MATHCONTEXT"
-
 // binding functions
 
 static inline math_t

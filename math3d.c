@@ -2399,6 +2399,8 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "point2plane",	lpoint2plane},
 
 		{ "CINTERFACE", NULL },
+		{ "_COBJECT", NULL },
+		{ "new", NULL },
 
 		{ NULL, NULL },
 	};
@@ -2438,10 +2440,10 @@ math3d_from_lua_id_(lua_State *L, struct math_context *M, int index) {
 	return id;
 }
 
-LUAMOD_API int
-luaopen_math3d(lua_State *L) {
-	luaL_checkversion(L);
+static int lnew_math3d(lua_State *L);
 
+static void
+math3d_object(lua_State *L, int maxpage) {
 	luaL_Reg ref_mt[] = {
 		{ "__newindex", lref_setter },
 		{ "__index", lref_getter },
@@ -2451,11 +2453,6 @@ luaopen_math3d(lua_State *L) {
 	};
 	luaL_newlibtable(L,ref_mt);
 	int refmeta = lua_gettop(L);
-	int maxpage = 0;
-	if (lua_getfield(L, LUA_REGISTRYINDEX, "MATH3D_MAXPAGE") == LUA_TNUMBER) {
-		maxpage = (int)lua_tointeger(L, -1);
-	}
-	lua_pop(L, 1);
 
 	struct math3d_api * M = lua_newuserdatauv(L, sizeof(struct math3d_api), 0);
 	M->M = math_new(maxpage);
@@ -2464,9 +2461,11 @@ luaopen_math3d(lua_State *L) {
 	M->from_lua_id = math3d_from_lua_id_;
 
 	finalize(L, boxstack_gc);
-	lua_setfield(L, LUA_REGISTRYINDEX, MATH3D_CONTEXT);
 
 	init_math3d_api(L, M);
+
+	lua_insert(L, -2);
+	lua_setfield(L, -2, "_COBJECT");
 
 	lua_pushlightuserdata(L, M);	// upvalue 1 of .ref
 
@@ -2477,6 +2476,29 @@ luaopen_math3d(lua_State *L) {
 
 	lua_pushcclosure(L, lref, 2);
 	lua_setfield(L, -2, "ref");
+
+	lua_pushcfunction(L, lnew_math3d);
+	lua_setfield(L, -2, "new");
+}
+
+static int
+lnew_math3d(lua_State *L) {
+	int maxpage = luaL_optinteger(L, 1, 0);
+	math3d_object(L, maxpage);
+	return 1;
+}
+
+LUAMOD_API int
+luaopen_math3d(lua_State *L) {
+	luaL_checkversion(L);
+
+	int maxpage = 0;
+	if (lua_getfield(L, LUA_REGISTRYINDEX, "MATH3D_MAXPAGE") == LUA_TNUMBER) {
+		maxpage = (int)lua_tointeger(L, -1);
+	}
+	lua_pop(L, 1);
+
+	math3d_object(L, maxpage);
 
 	return 1;
 }

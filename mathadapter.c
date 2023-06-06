@@ -460,10 +460,11 @@ lbind_output_quat(lua_State *L) {
 	return lbind_output(L, loutput_quat);
 }
 
-LUAMOD_API int
-luaopen_math3d_adapter(lua_State *L) {
-	luaL_checkversion(L);
-	
+static int
+adapter(lua_State *L) {
+	luaL_checktype(L, 1, LUA_TUSERDATA);
+	struct math3d_api * api = lua_touserdata(L, -1);
+
 	luaL_Reg l[] = {
 		{ "matrix", lbind_matrix },
 		{ "vector", lbind_vector},
@@ -477,15 +478,17 @@ luaopen_math3d_adapter(lua_State *L) {
 	};
 
 	luaL_newlibtable(L, l);
-
-	if (lua_getfield(L, LUA_REGISTRYINDEX, MATH3D_CONTEXT) != LUA_TUSERDATA) {
-		return luaL_error(L, "request 'math3d' first");
-	}
-	struct math3d_api * api = lua_touserdata(L, -1);
-	lua_pop(L, 1);
 	lua_pushlightuserdata(L, api);
-
 	luaL_setfuncs(L,l,1);
+
+	return 1;
+}
+
+LUAMOD_API int
+luaopen_math3d_adapter(lua_State *L) {
+	luaL_checkversion(L);
+
+	lua_pushcfunction(L, adapter);
 
 	return 1;
 }

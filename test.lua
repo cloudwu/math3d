@@ -250,7 +250,7 @@ do
 end
 
 print "===ADAPTER==="
-local adapter = require "math3d.adapter"
+local adapter = require "math3d.adapter" (math3d._COBJECT)
 local testfunc = require "math3d.adapter.test"
 
 local vector = adapter.vector(testfunc.vector, 1)	-- convert arguments to vector pointer from 1
