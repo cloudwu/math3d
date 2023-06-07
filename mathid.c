@@ -729,8 +729,8 @@ math_unmark(struct math_context *M, math_t id) {
 	return c;
 }
 
-static inline math_t
-new_marked(struct math_context *M, int type, int size, int count) {
+math_t
+math_premark(struct math_context *M, int type, int size) {
 	union {
 		math_t id;
 		struct math_id s;
@@ -747,31 +747,9 @@ new_marked(struct math_context *M, int type, int size, int count) {
 		vecsize *= 4;
 	}
 	assert(vecsize + index <= PAGE_SIZE);
-	M->p[page_id].count->count[index] = count;
-	return u.id;
-}
-
-math_t
-math_premark(struct math_context *M, int type, int size) {
-	union {
-		math_t id;
-		struct math_id s;
-	} u;
-	u.id = new_marked(M, type, size, 0);
+	M->p[page_id].count->count[index] = 0;
 	math_unmarked_insert(&M->unmarked, u.s);
 	return u.id;
-}
-
-float *
-math_markinit(struct math_context *M, int type, int size, math_t *id) {
-	union {
-		math_t id;
-		struct math_id s;
-	} u;
-	u.id = new_marked(M, type, size, 1);
-	*id = u.id;
-	
-	return get_marked(M, u.s.index);
 }
 
 static int

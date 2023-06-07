@@ -135,12 +135,6 @@ print "===QUAT==="
 do
 	local q = math3d.quaternion { 0, math.rad(60, 0), 0 }
 	print(math3d.tostring(q))
-	local q2 = math3d.marked_quat { 0, math.rad(60, 0), 0 }
-	print(math3d.tostring(q2))
-	local q3 = math3d.marked_quat { 0, 0, 0, 1 }
-	print(math3d.tostring(q3))
-	math3d.unmark(q2)
-	math3d.unmark(q3)
 	ref3 = math3d.ref()
 	ref3.m = math3d.quaternion { axis = {1,0,0}, r = math.rad(60) } -- init mat with quat
 	print(ref3)
@@ -285,9 +279,6 @@ print(math3d.tostring(v1), math3d.tostring(v2))
 
 print "===AABB&FRUSTUM==="
 do
-	local maabb = math3d.marked_aabb({-1,2,3} , {1,2,-3})
-	print(math3d.tostring(maabb))
-	math3d.unmark(maabb)
 	local aabb = math3d.ref(math3d.aabb(math3d.vector(-1, 2, 3), math3d.vector(1, 2, -3), math3d.vector(-2, 3, 6)))
 	assert(math3d.array_size(aabb) == 2)
 	print("aabb:min", math3d.tostring(math3d.array_index(aabb,1)), "aabb:max", math3d.tostring(math3d.array_index(aabb,2)))

@@ -2299,72 +2299,6 @@ lconstant_array(lua_State *L) {
 }
 
 static int
-get_vector(lua_State *L, int index, float v[4]) {
-	if (lua_type(L, index) != LUA_TTABLE)
-		return 1;
-	int i;
-	for (i=0;i<4;i++) {
-		int t = lua_geti(L, index, i+1);
-		if (i == 3 && t == LUA_TNIL) {
-			v[i] = 0;
-		} else if (t == LUA_TNUMBER) {
-			v[i] = lua_tonumber(L, -1);
-		} else {
-			lua_pop(L, 1);
-			return 1;	// error
-		}
-		lua_pop(L, 1);
-	}
-	return 0;	// ok
-}
-
-static int
-lmarked_vector(lua_State *L) {
-	struct math_context * M = GETMC(L);
-	math_t id;
-	float *v = math_markinit(M, MATH_TYPE_VEC4, 1, &id);
-	if (get_vector(L, 1, v)) {
-		math_unmark(M, id);
-		return luaL_error(L, "Invalid vecter table");
-	}
-	lua_pushmath(L, id);
-	return 1;
-}
-
-static int
-lmarked_quat(lua_State *L) {
-	struct math_context * M = GETMC(L);
-	math_t id;
-	float *v = math_markinit(M, MATH_TYPE_QUAT, 1, &id);
-	if (get_vector(L, 1, v)) {
-		math_unmark(M, id);
-		return luaL_error(L, "Invalid vecter table");
-	}
-	if (lua_geti(L, 1, 4) == LUA_TNIL) {
-		// It's euler
-		math3d_make_quat_from_euler_init(M, v, v);
-	}
-	lua_pop(L, 1);
-	lua_pushmath(L, id);
-	return 1;
-}
-
-static int
-lmarked_aabb(lua_State *L) {
-	struct math_context * M = GETMC(L);
-	math_t id;
-	float *v = math_markinit(M, MATH_TYPE_VEC4, 2, &id);
-	int err = get_vector(L, 1, v);
-	err |= get_vector(L, 2, v+4);
-	if (err) {
-		math_unmark(M, id);
-		return luaL_error(L, "Invalid aabb tables");
-	}
-	lua_pushmath(L, id);
-	return 1;
-}
-
-static int
 linfo(lua_State *L) {
 	struct math_context * M = GETMC(L);
 	if (lua_type(L, 1) == LUA_TNUMBER) {
@@ -2404,9 +2338,6 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "matrix", lmatrix },
 		{ "vector", lvector },
 		{ "quaternion", lquaternion },
-		{ "marked_vector", lmarked_vector },
-		{ "marked_quat", lmarked_quat },
-		{ "marked_aabb", lmarked_aabb },
 		{ "array_matrix_ref", larray_matrix_ref },
 		{ "array_vector", larray_vector },
 		{ "array_matrix", larray_matrix },

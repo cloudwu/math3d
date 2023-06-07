@@ -206,16 +206,6 @@ math3d_make_quat_from_euler(struct math_context *M, math_t euler) {
 	return math_quat(M, &q[0]);
 }
 
-void
-math3d_make_quat_from_euler_init(struct math_context *M, const float euler[3], float quat[4]) {
-	glm::vec3 e(euler[0], euler[1], euler[2]);
-	glm::quat q(e);
-	quat[0] = q[0];
-	quat[1] = q[1];
-	quat[2] = q[2];
-	quat[3] = q[3];
-}
-
 static int
 scale1(struct math_context *M, math_t s) {
 	const float * v = math_value(M, s);
