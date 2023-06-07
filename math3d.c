@@ -2361,6 +2361,21 @@ linfo(lua_State *L) {
 	return 1;
 }
 
+static int
+lcheckpoint(lua_State *L) {
+	struct math_context * M = GETMC(L);
+	lua_pushinteger(L, math_checkpoint(M));
+	return 1;
+}
+
+static int
+lrecover(lua_State *L) {
+	struct math_context * M = GETMC(L);
+	int cp = luaL_checkinteger(L, 1);
+	math_recover(M, cp);
+	return 0;
+}
+
 static void
 init_math3d_api(lua_State *L, struct math3d_api *M) {
 	luaL_Reg l[] = {
@@ -2466,6 +2481,9 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "marked_matrix", lmarked_matrix },
 		{ "marked_quat", lmarked_quat },
 		{ "marked_aabb", lmarked_aabb },
+
+		{ "checkpoint", lcheckpoint },
+		{ "recover", lrecover },
 
 		{ "CINTERFACE", NULL },
 		{ "_COBJECT", NULL },
