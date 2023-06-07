@@ -12,6 +12,7 @@ math_t math3d_matrix_to_quat(struct math_context *, math_t mat);
 math_t math3d_make_quat_from_axis(struct math_context *, math_t axis, float r);
 math_t math3d_quat_between_2vectors(struct math_context *, math_t a, math_t b);
 math_t math3d_make_quat_from_euler(struct math_context *, math_t euler);
+void math3d_make_quat_from_euler_init(struct math_context *, const float euler[3], float quat[4]);
 math_t math3d_make_srt(struct math_context *, math_t s, math_t r, math_t t);
 void math3d_decompose_matrix(struct math_context *, math_t mat, math_t v[3]);
 math_t math3d_decompose_scale(struct math_context *, math_t mat);
