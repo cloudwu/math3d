@@ -25,6 +25,7 @@ struct refobject {
 };
 
 #define FLAG_HOMOGENEOUS_DEPTH 0
+#define FLAG_ORIGIN_BOTTOM_LEFT 1
 
 static size_t
 getlen(lua_State *L, int index) {
@@ -1560,9 +1561,23 @@ lset_homogeneous_depth(lua_State *L) {
 }
 
 static int
+lset_origin_bottom_left(lua_State *L){
+	struct math_context *M = GETMC(L);
+	math_set_flag(M, FLAG_ORIGIN_BOTTOM_LEFT, lua_toboolean(L, 1));
+	return 0;
+}
+
+static int
 lget_homogeneous_depth(lua_State *L){
 	struct math_context *M = GETMC(L);
 	lua_pushboolean(L, math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH));
+	return 1;
+}
+
+static int
+lget_origin_bottom_left(lua_State *L){
+	struct math_context *M = GETMC(L);
+	lua_pushboolean(L, math_get_flag(M, FLAG_ORIGIN_BOTTOM_LEFT));
 	return 1;
 }
 
@@ -2418,7 +2433,9 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "forward_dir",lforward_dir},
 		{ "stacksize", lmemsize},	// todo : change name
 		{ "set_homogeneous_depth", lset_homogeneous_depth},
+		{ "set_origin_bottom_left", lset_origin_bottom_left},
 		{ "get_homogeneous_depth", lget_homogeneous_depth},
+		{ "get_origin_bottom_left", lget_origin_bottom_left},
 		{ "pack", lpack },
 		{ "isvalid", lisvalid},
 		{ "isequal", lisequal},
