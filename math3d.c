@@ -24,11 +24,7 @@ struct refobject {
 	math_t id;
 };
 
-static int g_default_homogeneous_depth = 0;
-static int g_origin_bottom_left = 0;
-int math3d_homogeneous_depth(){
-	return g_default_homogeneous_depth;
-}
+#define FLAG_HOMOGENEOUS_DEPTH 0
 
 static size_t
 getlen(lua_State *L, int index) {
@@ -39,11 +35,6 @@ getlen(lua_State *L, int index) {
 		return len;
 	}
 	return luaL_error(L, "lua_len returns %s", lua_typename(L, lua_type(L, -1)));
-}
-
-int
-math3d_origin_bottom_left(){
-	return g_origin_bottom_left;
 }
 
 static inline math_t
@@ -1449,6 +1440,8 @@ create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z) {
 	const float near = read_number(L, index, nn, 0.1f);
 	const float far = read_number(L, index, ff, 100.f);
 
+	int homogeneous_depth = math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH);
+
 	if (lua_getfield(L, index, "fov") == LUA_TNUMBER) {
 		float fov = (float)lua_tonumber(L, -1);
 		lua_pop(L, 1);
@@ -1456,7 +1449,7 @@ create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z) {
 		fov *= (float)M_PI / 180.f;
 
 		const float aspect = read_number(L, index, "aspect", 1.f);
-		return math3d_perspectiveLH(M, fov, aspect, near, far, g_default_homogeneous_depth);
+		return math3d_perspectiveLH(M, fov, aspect, near, far, homogeneous_depth);
 	} else {
 		lua_pop(L, 1); //pop "fov"
 
@@ -1470,9 +1463,9 @@ create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z) {
 		int ortho = lua_toboolean(L, -1);
 		lua_pop(L, 1);
 		if (ortho)
-			return math3d_orthoLH(M, left, right, bottom, top, near, far, g_default_homogeneous_depth);
+			return math3d_orthoLH(M, left, right, bottom, top, near, far, homogeneous_depth);
 		else
-			return math3d_frustumLH(M, left, right, bottom, top, near, far, g_default_homogeneous_depth);
+			return math3d_frustumLH(M, left, right, bottom, top, near, far, homogeneous_depth);
 	}
 }
 
@@ -1560,26 +1553,16 @@ lmemsize(lua_State *L) {
 }
 
 static int
-lset_homogeneous_depth(lua_State *L){
-	g_default_homogeneous_depth = lua_toboolean(L, 1) ? 1 : 0;
-	return 0;
-}
-
-static int
-lset_origin_bottom_left(lua_State *L){
-	g_origin_bottom_left = lua_toboolean(L, 1) ? 1 : 0;
+lset_homogeneous_depth(lua_State *L) {
+	struct math_context *M = GETMC(L);
+	math_set_flag(M, FLAG_HOMOGENEOUS_DEPTH, lua_toboolean(L, 1));
 	return 0;
 }
 
 static int
 lget_homogeneous_depth(lua_State *L){
-	lua_pushboolean(L, g_default_homogeneous_depth);
-	return 1;
-}
-
-static int
-lget_origin_bottom_left(lua_State *L){
-	lua_pushboolean(L, g_origin_bottom_left);
+	struct math_context *M = GETMC(L);
+	lua_pushboolean(L, math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH));
 	return 1;
 }
 
@@ -1975,7 +1958,7 @@ static int
 lfrustum_planes(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	math_t m = matrix_from_index(L, M, 1);
-	math_t planes = math3d_frustum_planes(M, m, g_default_homogeneous_depth);
+	math_t planes = math3d_frustum_planes(M, m, math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH));
 	lua_pushmath(L, planes);
 	return 1;
 }
@@ -2023,7 +2006,7 @@ static int
 lfrustum_points(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	math_t m = matrix_from_index(L, M, 1);
-	math_t result = math3d_frustum_points(M, m, g_default_homogeneous_depth);
+	math_t result = math3d_frustum_points(M, m, math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH));
 	lua_pushmath(L, result);
 	return 1;
 }
@@ -2435,9 +2418,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "forward_dir",lforward_dir},
 		{ "stacksize", lmemsize},	// todo : change name
 		{ "set_homogeneous_depth", lset_homogeneous_depth},
-		{ "set_origin_bottom_left", lset_origin_bottom_left},
 		{ "get_homogeneous_depth", lget_homogeneous_depth},
-		{ "get_origin_bottom_left", lget_origin_bottom_left},
 		{ "pack", lpack },
 		{ "isvalid", lisvalid},
 		{ "isequal", lisequal},

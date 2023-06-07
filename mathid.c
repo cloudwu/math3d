@@ -52,6 +52,7 @@ struct math_context {
 	int marked_page;
 	int marked_n;
 	int constant_n;
+	uint32_t flags;
 };
 
 int
@@ -115,8 +116,25 @@ math_new(int maxpage) {
 	memset(m->p, 0, sizeof(struct pages) * maxpage);
 	m->marked_n = 0;
 	m->constant_n = 0;
+	m->flags = 0;
 	math_unmarked_init(&m->unmarked);
 	return m;
+}
+
+void
+math_set_flag(struct math_context *M, int flag_id, int v) {
+	assert(flag_id >=0 && flag_id < 32);
+	if (v) {
+		M->flags |= 1 << flag_id;
+	} else {
+		M->flags &= ~(1 << flag_id);
+	}
+}
+
+int
+math_get_flag(struct math_context *M, int flag_id) {
+	uint32_t mask = 1 << flag_id;
+	return (M->flags & mask) != 0;
 }
 
 void

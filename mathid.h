@@ -25,6 +25,8 @@ static const math_t MATH_NULL = { 0 };
 struct math_context * math_new(int maxpage);
 void math_delete(struct math_context *);
 int math_info(struct math_context *, int what);
+void math_set_flag(struct math_context *, int flag_id, int v);
+int math_get_flag(struct math_context *, int flag_id);
 size_t math_memsize(struct math_context *);
 void math_frame(struct math_context *);
 int math_checkpoint(struct math_context *);

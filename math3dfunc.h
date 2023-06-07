@@ -3,8 +3,6 @@
 
 #include "mathid.h"
 
-int math3d_homogeneous_depth();
-
 // math functions
 math_t math3d_matrix_from_cols(struct math_context*, math_t c1, math_t c2, math_t c3, math_t c4);
 math_t math3d_quat_to_matrix(struct math_context *, math_t quat);
