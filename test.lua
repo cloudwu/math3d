@@ -467,6 +467,10 @@ do
 end
 
 print("N = ", math3d.info "transient")
+local m = math3d.marked_matrix { s = 1 , t = { 0,0,0 } }
+print(math3d.tostring(m))
+math3d.unmark(m)
+print("N = ", math3d.info "transient")
 
 do
 	math3d.reset()

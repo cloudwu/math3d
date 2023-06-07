@@ -27,6 +27,8 @@ void math_delete(struct math_context *);
 int math_info(struct math_context *, int what);
 size_t math_memsize(struct math_context *);
 void math_frame(struct math_context *);
+int math_checkpoint(struct math_context *);
+void math_recover(struct math_context *, int cp);
 math_t math_import(struct math_context *, const float *v, int type, int size);
 math_t math_ref(struct math_context *, const float *v, int type, int size);
 math_t math_premark(struct math_context *, int type, int size);

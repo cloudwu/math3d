@@ -665,7 +665,7 @@ lref_gc(lua_State *L) {
 }
 
 static math_t
-new_object_(lua_State *L, int type, from_table_func from_table, int narray) {
+new_object(lua_State *L, int type, from_table_func from_table, int narray) {
 	if (lua_type(L, 1) == LUA_TSTRING) {
 		size_t sz;
 		const float * v = (const float *)lua_tolstring(L, 1, &sz);
@@ -705,13 +705,6 @@ new_object_(lua_State *L, int type, from_table_func from_table, int narray) {
 		}
 	}
 	return id;
-}
-
-static int
-new_object(lua_State *L, int type, from_table_func from_table, int narray) {
-	math_t id = new_object_(L, type, from_table, narray);
-	lua_pushmath(L, id);
-	return 1;
 }
 
 static int
@@ -856,8 +849,8 @@ object_to_quat(lua_State *L, struct math_context *M, int index) {
 	}
 }
 
-static int
-lmatrix(lua_State *L) {
+static math_t
+lmatrix_(lua_State *L) {
 	if (lua_isuserdata(L, 1)) {
 		struct math_context *M = GETMC(L);
 
@@ -866,42 +859,38 @@ lmatrix(lua_State *L) {
 			math_t id = get_id(L, M, 1);
 			int type = math_type(M, id);
 			if (type != MATH_TYPE_QUAT) {
-				return luaL_error(L, "create matrix with 1 argument, this argument must be 'quaternion', but %s is provided", math_typename(type));
+				luaL_error(L, "create matrix with 1 argument, this argument must be 'quaternion', but %s is provided", math_typename(type));
 			}
 			id = math3d_quat_to_matrix(M, id);
-			lua_pushmath(L, id);
-			return 1;
+			return id;
 		} else if (n == 4){
-			lua_pushmath(L,
-				math3d_matrix_from_cols(M, 
+			return math3d_matrix_from_cols(M,
 					vector_from_index(L, M, 1),
 					vector_from_index(L, M, 2),
 					vector_from_index(L, M, 3),
-					vector_from_index(L, M, 4))
+					vector_from_index(L, M, 4)
 			);
-
-			return 1;
 		} else {
-			return luaL_error(L, "Incorrect argument number:%d, 1 argument with quaternion or 4 arguments with vectors is valid");
+			luaL_error(L, "Incorrect argument number:%d, 1 argument with quaternion or 4 arguments with vectors is valid");
 		}
 	}
 	return new_object(L, MATH_TYPE_MAT, matrix_from_table, 16);
 }
 
-static int
-lvector(lua_State *L) {
+static math_t
+lvector_(lua_State *L) {
 	int top = lua_gettop(L);
 	if (top == 3) {
 		lua_pushnumber(L, 0.0f);
 	} else if (top == 2) {
 		struct math_context *M = GETMC(L);
 		if (!lua_isuserdata(L, 1)) {
-			return luaL_error(L, "Should be (vector id , number)");
+			luaL_error(L, "Should be (vector id , number)");
 		}
 		math_t id = get_id(L, M, 1);
 		int type = math_type(M, id);
 		if (type != MATH_TYPE_VEC4) {
-			return luaL_error(L, "Need a vector, it's %s", math_typename(type));
+			luaL_error(L, "Need a vector, it's %s", math_typename(type));
 		}
 		float n4 = (float)luaL_checknumber(L, 2);
 		const float *vec3 = math_value(M, id);
@@ -913,33 +902,72 @@ lvector(lua_State *L) {
 			vec4[2] = vec3[2];
 			vec4[3] = n4;
 		}
-		lua_pushmath(L, id);
-		return 1;
+		return id;
 	}
 	return new_object(L, MATH_TYPE_VEC4, vector_from_table, 4);
 }
 
-static int
-lquaternion(lua_State *L) {
+static math_t
+lquaternion_(lua_State *L) {
 	const int n = lua_gettop(L);
 	if (n == 1 && lua_isuserdata(L, 1)){
-		math_t id = object_to_quat(L, GETMC(L), 1);
-		lua_pushmath(L, id);
-		return 1;
+		return object_to_quat(L, GETMC(L), 1);
 	}
 
 	if (n == 2 && lua_isuserdata(L, 1) && lua_isuserdata(L, 2)){
 		struct math_context *M = GETMC(L);
 		math_t id1 = get_id(L, M, 1);
 		math_t id2 = get_id(L, M, 2);
-		math_t r = math3d_quat_between_2vectors(M, id1, id2);
-		lua_pushmath(L, r);
-		return 1;
+		return math3d_quat_between_2vectors(M, id1, id2);
 	}
 
 	return new_object(L, MATH_TYPE_QUAT, quat_from_table, 4);
 }
 
+typedef math_t (*math_lfunc)(lua_State *L);
+
+static inline int
+marked_ctor(lua_State *L, math_lfunc f) {
+	struct math_context *M = GETMC(L);
+	int cp = math_checkpoint(M);
+	math_t id = math_mark(M, f(L));
+	lua_pushmath(L, id);
+	math_recover(M, cp);
+	return 1;
+}
+
+static int
+lvector(lua_State *L) {
+	lua_pushmath(L, lvector_(L));
+	return 1;
+}
+
+static int
+lmarked_vector(lua_State *L) {
+	return marked_ctor(L, lvector_);
+}
+
+static int
+lmatrix(lua_State *L) {
+	lua_pushmath(L, lmatrix_(L));
+	return 1;
+}
+
+static int
+lmarked_matrix(lua_State *L) {
+	return marked_ctor(L, lmatrix_);
+}
+
+static int
+lquaternion(lua_State *L) {
+	lua_pushmath(L, lquaternion_(L));
+	return 1;
+}
+
+static int
+lmarked_quat(lua_State *L) {
+	return marked_ctor(L, lquaternion_);
+}
 
 static int
 larray_matrix_ref(lua_State *L) {
@@ -1712,8 +1740,8 @@ append_aabb(lua_State *L, struct math_context *M, math_t aabb, int from_index, i
 	}
 }
 
-static int
-laabb(lua_State *L) {
+static math_t
+laabb_(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	math_t id;
 	float *aabb = alloc_aabb(L, M, &id);
@@ -1732,9 +1760,18 @@ laabb(lua_State *L) {
 		id = append_aabb(L, M, id, 1, top);
 	}
 
-	lua_pushmath(L, id);
+	return id;
+}
 
+static int
+laabb(lua_State *L) {
+	lua_pushmath(L, laabb_(L));
 	return 1;
+}
+
+static int
+lmarked_aabb(lua_State *L) {
+	return marked_ctor(L, laabb_);
 }
 
 static int
@@ -2424,6 +2461,11 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 
 		//primitive
 		{ "point2plane",	lpoint2plane},
+
+		{ "marked_vector", lmarked_vector },
+		{ "marked_matrix", lmarked_matrix },
+		{ "marked_quat", lmarked_quat },
+		{ "marked_aabb", lmarked_aabb },
 
 		{ "CINTERFACE", NULL },
 		{ "_COBJECT", NULL },

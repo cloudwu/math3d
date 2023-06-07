@@ -849,6 +849,17 @@ math_frame(struct math_context *M) {
 	M->n = 0;
 }
 
+int
+math_checkpoint(struct math_context *M) {
+	return M->n;
+}
+
+void
+math_recover(struct math_context *M, int cp) {
+	assert(M->n >= cp);
+	M->n = cp;
+}
+
 const char *
 math_typename(int t) {
 	static const char * type_names[] = {
