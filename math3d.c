@@ -1543,7 +1543,8 @@ vec_min_or_max(lua_State *L, float defvalue, minmax_func f){
 	const int isv4 = lua_isnoneornil(L, 2);
 	const float* vv = math_value(M, v);
 	float mmv = defvalue;
-	for (uint8_t ii=0; ii<3; ++ii){
+	int n = isv4 ? 4 : 3;
+	for (uint8_t ii=0; ii < n; ++ii){
 		mmv = f(mmv, vv[ii]);
 	}
 
