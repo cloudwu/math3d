@@ -1501,6 +1501,82 @@ lminmax(lua_State *L) {
 	return 2;
 }
 
+typedef float (*minmax_func)(float _X, float _Y);
+
+static int
+min_or_max(lua_State *L, minmax_func f){
+	struct math_context *M = GETMC(L);
+	const math_t lhs = vector_from_index(L, M, 1);
+	const math_t rhs = vector_from_index(L, M, 2);
+
+	const int isv4 = lua_isnoneornil(L, 3);
+
+	const float *lhsv = math_value(M, lhs);
+	const float *rhsv = math_value(M, rhs);
+
+	const math_t rid = math_import(M, NULL, MATH_TYPE_VEC4, 1);
+	float* r = math_init(M, rid);
+	for (uint8_t ii=0; ii<3; ++ii){
+		r[ii] = f(lhsv[ii], rhsv[ii]);
+	}
+
+	r[3] = isv4 ? f(lhsv[3], rhsv[3]) : 0.f;
+
+	lua_pushmath(L, rid);
+	return 1;
+}
+
+static int
+lmin(lua_State *L){
+	return min_or_max(L, fminf);
+}
+
+static int
+lmax(lua_State *L){
+	return min_or_max(L, fmaxf);
+}
+
+static inline int
+vec_min_or_max(lua_State *L, float defvalue, minmax_func f){
+	struct math_context *M = GETMC(L);
+	const math_t v = vector_from_index(L, M, 1);
+	const int isv4 = lua_isnoneornil(L, 2);
+	const float* vv = math_value(M, v);
+	float mmv = defvalue;
+	for (uint8_t ii=0; ii<3; ++ii){
+		mmv = f(mmv, vv[ii]);
+	}
+
+	lua_pushnumber(L, mmv);
+	return 1;
+}
+
+static int
+lvec_min(lua_State *L){
+	return vec_min_or_max(L, FLT_MAX, fminf);
+}
+
+static int
+lvec_max(lua_State *L){
+	return vec_min_or_max(L, FLT_MIN, fmaxf);
+}
+
+static int
+lvec_abs(lua_State *L){
+	struct math_context *M = GETMC(L);
+	const math_t v = vector_from_index(L, M, 1);
+	const float* vv = math_value(M, v);
+
+	const math_t absid = math_import(M, NULL, MATH_TYPE_VEC4, 1);
+	float* absv = math_init(M, absid);
+	for (uint8_t ii=0; ii<4; ++ii){
+		absv[ii] = (float)fabs(vv[ii]);
+	}
+
+	lua_pushmath(L, absid);
+	return 1;
+}
+
 static int
 llerp(lua_State *L){
 	struct math_context *M = GETMC(L);
@@ -2426,6 +2502,11 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "transformH", ltransform_homogeneous_point },
 		{ "projmat", lprojmat },
 		{ "minmax", lminmax},
+		{ "min", lmin},
+		{ "max", lmax},
+		{ "vec_min", lvec_min},
+		{ "vec_max", lvec_max},
+		{ "vec_abs", lvec_abs},
 		{ "lerp", llerp},
 		{ "slerp", lslerp},
 		{ "quat2euler", lquat2euler},
