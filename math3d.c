@@ -1547,6 +1547,10 @@ vec_min_or_max(lua_State *L, float defvalue, minmax_func f){
 		mmv = f(mmv, vv[ii]);
 	}
 
+	if (isv4){
+		mmv = f(mmv, vv[3]);
+	}
+
 	lua_pushnumber(L, mmv);
 	return 1;
 }
