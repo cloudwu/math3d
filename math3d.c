@@ -2451,6 +2451,14 @@ lrecover(lua_State *L) {
 	return 0;
 }
 
+static int
+llive(lua_State *L) {
+	struct math_context * M = GETMC(L);
+	math_t id = get_id(L, M, 1);
+	lua_pushmath(L, math_live(M, id));
+	return 1;
+}
+
 static void
 init_math3d_api(lua_State *L, struct math3d_api *M) {
 	luaL_Reg l[] = {
@@ -2564,6 +2572,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 
 		{ "checkpoint", lcheckpoint },
 		{ "recover", lrecover },
+		{ "live", llive },
 
 		{ "CINTERFACE", NULL },
 		{ "_COBJECT", NULL },

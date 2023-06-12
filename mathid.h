@@ -44,6 +44,7 @@ int math_marked(struct math_context *, math_t id);
 void math_print(struct math_context *, math_t id);	// for debug only
 const char * math_typename(int type);
 math_t math_constant(struct math_context *, math_t);
+math_t math_live(struct math_context *, math_t id);
 
 static inline int
 math_issame(math_t id1, math_t id2) {

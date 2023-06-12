@@ -44,11 +44,16 @@ struct pages {
 
 struct math_context {
 	struct pages *p;
-	struct math_unmarked unmarked;
+	struct math_unmarked unmarked_a;
+	struct math_unmarked unmarked_b;
+	struct math_unmarked *unmarked;
 	struct marked_freelist *freelist;
 	int maxpage;
 	int frame;
+	int last_frame;
 	int n;
+	int section_a;	// available [0, a)
+	int section_b;	// available [b, inf)
 	int marked_page;
 	int marked_n;
 	int constant_n;
@@ -109,6 +114,7 @@ math_new(int maxpage) {
 		maxpage = DEFAULT_MAX_PAGE;
 	m->maxpage = maxpage;
 	m->frame = 0;
+	m->last_frame = 0;
 	m->n = 0;
 	m->marked_page = 0;
 	m->freelist = NULL;
@@ -117,7 +123,11 @@ math_new(int maxpage) {
 	m->marked_n = 0;
 	m->constant_n = 0;
 	m->flags = 0;
-	math_unmarked_init(&m->unmarked);
+	m->section_a = 0;
+	m->section_b = 0;
+	math_unmarked_init(&m->unmarked_a);
+	math_unmarked_init(&m->unmarked_b);
+	m->unmarked = &m->unmarked_a;
 	return m;
 }
 
@@ -167,7 +177,8 @@ math_delete(struct math_context *M) {
 		}
 		free(M->p[i].count);
 	}
-	math_unmarked_deinit(&M->unmarked);
+	math_unmarked_deinit(&M->unmarked_a);
+	math_unmarked_deinit(&M->unmarked_b);
 	free(M->p);
 	free(M);
 }
@@ -202,19 +213,28 @@ math_memsize(struct math_context *M) {
 		}
 		sz += sizeof(struct marked_count);
 	}
-	sz += math_unmarked_size(&M->unmarked);
+	sz += math_unmarked_size(&M->unmarked_a);
+	sz += math_unmarked_size(&M->unmarked_b);
 	return sz;
 }
 
 static void *
 allocvec(struct math_context *M, int size, int *index) {
-	int page_id = M->n / PAGE_SIZE;
-	int next_page_id = (M->n + size - 1) / PAGE_SIZE;
+	int n = M->n;
+	if (n < M->section_b) {
+		// In section A
+		if (n + size > M->section_a) {
+			// Section A is not big enough, move to section B
+			n = M->section_b;
+		}
+	}
+	int page_id = n / PAGE_SIZE;
+	int next_page_id = (n + size - 1) / PAGE_SIZE;
 	int maxpage = M->maxpage;
 	assert(next_page_id < maxpage);	// page_id overflow check
 	if (next_page_id != page_id) {
 		page_id = next_page_id;
-		M->n = page_id * PAGE_SIZE;
+		n = page_id * PAGE_SIZE;
 	}
 	if (M->p[page_id].transient == NULL) {
 		M->p[page_id].transient = (struct page *)malloc(sizeof(struct page));
@@ -222,8 +242,8 @@ allocvec(struct math_context *M, int size, int *index) {
 			M->p[page_id+1].transient = NULL;
 		}
 	}
-	*index = M->n;
-	M->n += size;
+	*index = n;
+	M->n = n + size;
 	return M->p[page_id].transient->v[*index % PAGE_SIZE];
 }
 
@@ -289,7 +309,6 @@ math_ref(struct math_context *M, const float *v, int type, int size) {
 
 float *
 get_transient(struct math_context *M, int index) {
-	assert(index < M->n);
 	int page_id = index / PAGE_SIZE;
 	return M->p[page_id].transient->v[index % PAGE_SIZE];
 }
@@ -318,6 +337,11 @@ math_ref_type_(struct math_context *M, struct math_id id) {
 	return r->type;
 }
 
+static int inline
+frame_alive(struct math_context *M, int f) {
+	return (M->frame == f) || (M->last_frame == f);
+}
+
 int
 math_valid(struct math_context *M, math_t id) {
 	union {
@@ -326,7 +350,7 @@ math_valid(struct math_context *M, math_t id) {
 	} u;
 	u.id = id;
 	if (u.s.transient) {
-		return M->frame == u.s.frame;
+		return frame_alive(M, u.s.frame);
 	} else {
 		if (u.s.frame == 0)
 			return 1;
@@ -422,7 +446,7 @@ math_value(struct math_context *M, math_t id) {
 	} u;
 	u.id = id;
 	if (u.s.transient) {
-		assert(u.s.frame == M->frame);
+		assert(frame_alive(M, u.s.frame));
 		if (u.s.type == MATH_TYPE_REF) {
 			return get_reference(M, u.s.index, u.s.size);
 		}
@@ -741,7 +765,7 @@ math_unmark(struct math_context *M, math_t id) {
 	assert(c > 0);
 	if (c == 1) {
 		// The last reference
-		math_unmarked_insert(&M->unmarked, u.s);
+		math_unmarked_insert(M->unmarked, u.s);
 	}
 	*count = c - 1;
 	return c;
@@ -766,7 +790,7 @@ math_premark(struct math_context *M, int type, int size) {
 	}
 	assert(vecsize + index <= PAGE_SIZE);
 	M->p[page_id].count->count[index] = 0;
-	math_unmarked_insert(&M->unmarked, u.s);
+	math_unmarked_insert(M->unmarked, u.s);
 	return u.id;
 }
 
@@ -802,28 +826,28 @@ block_size(int64_t *ptr, int64_t *endptr, int *r_index, int *r_size) {
 
 static void
 free_unmarked(struct math_context *M) {
-	int n = M->unmarked.n;
+	int n = M->unmarked->n;
 	if (n == 0)
 		return;
-	M->unmarked.n = 0;
-	qsort(M->unmarked.index, n, sizeof(int64_t), int64_compr);
+	M->unmarked->n = 0;
+	qsort(M->unmarked->index, n, sizeof(int64_t), int64_compr);
 
 	// remove alive and dup index
 	int i;
 	int p = 0;
 	int sz;
-	int last = math_unmark_index_(M->unmarked.index[0], &sz);
+	int last = math_unmark_index_(M->unmarked->index[0], &sz);
 	int page_id = last / PAGE_SIZE;
 	if (M->p[page_id].count->count[last % PAGE_SIZE] == 0) {
 		++p;
 	}
 	for (i=1;i<n;i++) {
-		int current = math_unmark_index_(M->unmarked.index[i], &sz);
+		int current = math_unmark_index_(M->unmarked->index[i], &sz);
 		if (current != last) {
 			last = current;
 			page_id = current / PAGE_SIZE;
 			if (M->p[page_id].count->count[current % PAGE_SIZE] == 0) {
-				M->unmarked.index[p++] = M->unmarked.index[i];
+				M->unmarked->index[p++] = M->unmarked->index[i];
 			}
 		}
 	}
@@ -831,8 +855,8 @@ free_unmarked(struct math_context *M) {
 	if (p == 0)
 		return;
 
-	int64_t *ptr = M->unmarked.index;
-	int64_t *endptr = M->unmarked.index + p;
+	int64_t *ptr = M->unmarked->index;
+	int64_t *endptr = M->unmarked->index + p;
 	while (ptr < endptr) {
 		int index;
 		int sz;
@@ -852,6 +876,7 @@ math_frame(struct math_context *M) {
 		struct math_id s;
 	} u;
 	memset(&u, 0xff, sizeof(u));
+	M->last_frame = M->frame;
 	++M->frame;
 	if (M->frame > u.s.frame) {
 		M->frame = 0;
@@ -864,7 +889,25 @@ math_frame(struct math_context *M) {
 		M->p[i].transient = NULL;
 	}
 	free_unmarked(M);
-	M->n = 0;
+	if (M->unmarked == &M->unmarked_a) {
+		M->unmarked = &M->unmarked_b;
+	} else {
+		M->unmarked = &M->unmarked_a;
+	}
+	if (M->section_b == 0) {
+		// .... n .......
+		assert(M->section_a == 0);
+		M->section_b = M->n;
+	} else if (M->section_a == 0) {
+		// XXXXXX b ..... n
+		M->section_a = M->section_b;
+		M->section_b = M->n;
+		M->n = 0;
+	} else {
+		// .... XXXXXXX .... n
+		M->section_a = 0;
+		M->section_b = M->n;
+	}
 }
 
 int
@@ -876,6 +919,23 @@ void
 math_recover(struct math_context *M, int cp) {
 	assert(M->n >= cp);
 	M->n = cp;
+}
+
+math_t
+math_live(struct math_context *ctx, math_t id) {
+	union {
+		math_t id;
+		struct math_id s;
+	} u;
+	u.id = id;
+	if (u.s.transient) {
+		int f = u.s.frame;
+		if (ctx->frame == f)
+			return id;
+		return math_import(ctx, math_value(ctx, id), math_type(ctx, id), math_size(ctx, id));
+	} else {
+		return id;
+	}
 }
 
 const char *
