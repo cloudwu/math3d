@@ -888,12 +888,12 @@ math_frame(struct math_context *M) {
 		free(M->p[i].transient);
 		M->p[i].transient = NULL;
 	}
-	free_unmarked(M);
 	if (M->unmarked == &M->unmarked_a) {
 		M->unmarked = &M->unmarked_b;
 	} else {
 		M->unmarked = &M->unmarked_a;
 	}
+	free_unmarked(M);
 	if (M->section_b == 0) {
 		// .... n .......
 		assert(M->section_a == 0);
@@ -932,10 +932,11 @@ math_live(struct math_context *ctx, math_t id) {
 		int f = u.s.frame;
 		if (ctx->frame == f)
 			return id;
-		return math_import(ctx, math_value(ctx, id), math_type(ctx, id), math_size(ctx, id));
-	} else {
+	} else if (u.s.frame == 0) {
+		// constant
 		return id;
 	}
+	return math_import(ctx, math_value(ctx, id), math_type(ctx, id), math_size(ctx, id));
 }
 
 const char *
