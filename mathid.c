@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <inttypes.h>
 
-#define DEFAULT_MAX_PAGE 256
+#define DEFAULT_MAX_PAGE 512
 #define PAGE_SIZE 1024
 #define UNMARK_SIZE 1024
 
