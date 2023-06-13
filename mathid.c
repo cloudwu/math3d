@@ -900,9 +900,13 @@ math_frame(struct math_context *M) {
 		M->section_b = M->n;
 	} else if (M->section_a == 0) {
 		// XXXXXX b ..... n
-		M->section_a = M->section_b;
+		int xx = M->section_b;
 		M->section_b = M->n;
-		M->n = 0;
+		if (2 * xx > M->n) {
+			// XXXXXXX is larger than ....
+			M->section_a = xx;
+			M->n = 0;
+		}
 	} else {
 		// .... XXXXXXX .... n
 		M->section_a = 0;
