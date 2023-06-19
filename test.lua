@@ -474,11 +474,13 @@ print("N = ", math3d.info "transient")
 
 do
 	math3d.reset()
+	print("LAST = ", math3d.info "last")
 	for i = 1, 4096 do
 		math3d.matrix {}
 		math3d.vector { 0,0,0}
 	end
 	math3d.reset()
+	print("LAST = ", math3d.info "last")
 
 	print(math3d.tostring(math3d.vector(0,0,0)))
 end

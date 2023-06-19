@@ -4,7 +4,7 @@
 #include <assert.h>
 #include <inttypes.h>
 
-#define DEFAULT_MAX_PAGE 1024
+#define DEFAULT_MAX_PAGE 512
 #define PAGE_SIZE 1024
 #define UNMARK_SIZE 1024
 
@@ -52,8 +52,8 @@ struct math_context {
 	int frame;
 	int last_frame;
 	int n;
-	int section_a;	// available [0, a)
-	int section_b;	// available [b, inf)
+	int base;
+	int top;
 	int marked_page;
 	int marked_n;
 	int constant_n;
@@ -68,7 +68,9 @@ math_info(struct math_context *M, int what) {
 		case MATH_INFO_FRAME:
 			return M->frame;
 		case MATH_INFO_TRANSIENT:
-			return M->n;
+			return (M->n > M->base) ? M->n - M->base : M->n + DEFAULT_MAX_PAGE * PAGE_SIZE - M->top;
+		case MATH_INFO_LAST :
+			return (M->base > M->top) ? M->base - M->top : DEFAULT_MAX_PAGE * PAGE_SIZE - M->top + M->base;
 		case MATH_INFO_MARKED:
 			return M->marked_n;
 		case MATH_INFO_CONSTANT:
@@ -123,8 +125,8 @@ math_new(int maxpage) {
 	m->marked_n = 0;
 	m->constant_n = 0;
 	m->flags = 0;
-	m->section_a = 0;
-	m->section_b = 0;
+	m->base = 0;
+	m->top = 0;
 	math_unmarked_init(&m->unmarked_a);
 	math_unmarked_init(&m->unmarked_b);
 	m->unmarked = &m->unmarked_a;
@@ -160,9 +162,6 @@ math_delete(struct math_context *M) {
 		free(M->p[i].constant);
 	}
 	for (i=0;i<maxpage;i++) {
-		if (M->p[i].transient == NULL) {
-			break;
-		}
 		free(M->p[i].transient);
 	}
 	for (i=0;i<maxpage;i++) {
@@ -196,10 +195,9 @@ math_memsize(struct math_context *M) {
 		sz += sizeof(struct page);
 	}
 	for (i=0;i<maxpage;i++) {
-		if (M->p[i].transient == NULL) {
-			break;
+		if (M->p[i].transient) {
+			sz += sizeof(struct page);
 		}
-		sz += sizeof(struct page);
 	}
 	for (i=0;i<maxpage;i++) {
 		if (M->p[i].marked == NULL) {
@@ -218,32 +216,50 @@ math_memsize(struct math_context *M) {
 	return sz;
 }
 
+static void
+alloc_transient_page(struct math_context *M, int page_id) {
+	int top_page = M->top / PAGE_SIZE;
+	int i;
+	int from_page = 0;
+	if (page_id < top_page)
+		from_page = page_id + 1;
+	for (i = from_page; i < top_page; i++) {
+		struct page * p = M->p[i].transient;
+		if (p) {
+			// reuse old transient page
+			M->p[page_id].transient = p;
+			M->p[i].transient = NULL;
+			return;
+		}
+	}
+	M->p[page_id].transient = (struct page *)malloc(sizeof(struct page));
+}
+
 static void *
 allocvec(struct math_context *M, int size, int *index) {
 	int n = M->n;
-	if (n < M->section_b) {
-		// In section A
-		if (n + size > M->section_a) {
-			// Section A is not big enough, move to section B
-			n = M->section_b;
-		}
-	}
+	int rewind = n < M->top;
 	int page_id = n / PAGE_SIZE;
 	int next_page_id = (n + size - 1) / PAGE_SIZE;
 	int maxpage = M->maxpage;
-	assert(next_page_id < maxpage);	// page_id overflow check
 	if (next_page_id != page_id) {
 		page_id = next_page_id;
 		n = page_id * PAGE_SIZE;
+		assert(size <= PAGE_SIZE);
+		if (!rewind && page_id >= maxpage) {
+			page_id = 0;
+			n = 0;
+			rewind = 1;
+		}
 	}
 	if (M->p[page_id].transient == NULL) {
-		M->p[page_id].transient = (struct page *)malloc(sizeof(struct page));
-		if (page_id + 1 < maxpage) {
-			M->p[page_id+1].transient = NULL;
-		}
+		alloc_transient_page(M, page_id);
 	}
 	*index = n;
 	M->n = n + size;
+	if (rewind) {
+		assert(M->n < M->top);
+	}
 	return M->p[page_id].transient->v[*index % PAGE_SIZE];
 }
 
@@ -894,24 +910,8 @@ math_frame(struct math_context *M) {
 		M->unmarked = &M->unmarked_a;
 	}
 	free_unmarked(M);
-	if (M->section_b == 0) {
-		// .... n .......
-		assert(M->section_a == 0);
-		M->section_b = M->n;
-	} else if (M->section_a == 0) {
-		// XXXXXX b ..... n
-		int xx = M->section_b;
-		M->section_b = M->n;
-		if (2 * xx > M->n) {
-			// XXXXXXX is larger than ....
-			M->section_a = xx;
-			M->n = 0;
-		}
-	} else {
-		// .... XXXXXXX .... n
-		M->section_a = 0;
-		M->section_b = M->n;
-	}
+	M->top = M->base;
+	M->base = M->n;
 }
 
 int

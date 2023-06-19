@@ -2421,6 +2421,8 @@ linfo(lua_State *L) {
 	int w = 0;
 	if (strcmp(what, "transient") == 0) {
 		w = MATH_INFO_TRANSIENT;
+	} else if (strcmp(what, "last") == 0) {
+		w = MATH_INFO_LAST;
 	} else if (strcmp(what, "marked") == 0) {
 		w = MATH_INFO_MARKED;
 	} else if (strcmp(what, "constant") == 0) {

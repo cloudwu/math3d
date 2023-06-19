@@ -20,7 +20,8 @@ static const math_t MATH_NULL = { 0 };
 #define MATH_INFO_FRAME 1
 #define MATH_INFO_TRANSIENT 2
 #define MATH_INFO_MARKED 3
-#define MATH_INFO_CONSTANT 4
+#define MATH_INFO_LAST 4
+#define MATH_INFO_CONSTANT 5
 
 struct math_context * math_new(int maxpage);
 void math_delete(struct math_context *);
