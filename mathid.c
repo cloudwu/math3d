@@ -62,7 +62,7 @@ struct math_context {
 
 static inline int
 transient_used(struct math_context *M, int n) {
-	return (n > M->base) ? n - M->base : n + M->maxpage * PAGE_SIZE - M->top;
+	return (n >= M->base) ? n - M->base : n + M->maxpage * PAGE_SIZE - M->base;
 }
 
 int
@@ -75,7 +75,7 @@ math_info(struct math_context *M, int what) {
 		case MATH_INFO_TRANSIENT:
 			return transient_used(M, M->n);
 		case MATH_INFO_LAST :
-			return (M->base > M->top) ? M->base - M->top : M->maxpage * PAGE_SIZE - M->top + M->base;
+			return (M->base >= M->top) ? M->base - M->top : M->maxpage * PAGE_SIZE - M->top + M->base;
 		case MATH_INFO_MARKED:
 			return M->marked_n;
 		case MATH_INFO_CONSTANT:
