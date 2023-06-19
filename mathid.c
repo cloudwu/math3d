@@ -60,6 +60,11 @@ struct math_context {
 	uint32_t flags;
 };
 
+static inline int
+transient_used(struct math_context *M, int n) {
+	return (n > M->base) ? n - M->base : n + DEFAULT_MAX_PAGE * PAGE_SIZE - M->top;
+}
+
 int
 math_info(struct math_context *M, int what) {
 	switch (what) {
@@ -68,7 +73,7 @@ math_info(struct math_context *M, int what) {
 		case MATH_INFO_FRAME:
 			return M->frame;
 		case MATH_INFO_TRANSIENT:
-			return (M->n > M->base) ? M->n - M->base : M->n + DEFAULT_MAX_PAGE * PAGE_SIZE - M->top;
+			return transient_used(M, M->n);
 		case MATH_INFO_LAST :
 			return (M->base > M->top) ? M->base - M->top : DEFAULT_MAX_PAGE * PAGE_SIZE - M->top + M->base;
 		case MATH_INFO_MARKED:
@@ -921,7 +926,7 @@ math_checkpoint(struct math_context *M) {
 
 void
 math_recover(struct math_context *M, int cp) {
-	assert(M->n >= cp);
+	assert(transient_used(M, M->n) >= transient_used(M, cp));
 	M->n = cp;
 }
 
