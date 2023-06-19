@@ -251,11 +251,11 @@ allocvec(struct math_context *M, int size, int *index) {
 		page_id = next_page_id;
 		n = page_id * PAGE_SIZE;
 		assert(size <= PAGE_SIZE);
-		if (!rewind && page_id >= maxpage) {
-			page_id = 0;
-			n = 0;
-			rewind = 1;
-		}
+	}
+	if (!rewind && page_id >= maxpage) {
+		page_id = 0;
+		n = 0;
+		rewind = 1;
 	}
 	if (M->p[page_id].transient == NULL) {
 		alloc_transient_page(M, page_id);
