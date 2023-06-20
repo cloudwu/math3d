@@ -529,7 +529,7 @@ new_marked_page(struct math_context *M) {
 	memset(M->p[page].count, 0, sizeof(struct marked_count));
 
 	struct marked_freelist *node = (struct marked_freelist *)M->p[page].marked;
-	node->next = M->freelist;
+	node->next = NULL;
 	node->page = page;
 	node->size = PAGE_SIZE;
 	return node;
