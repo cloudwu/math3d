@@ -879,7 +879,6 @@ free_unmarked(struct math_context *M) {
 	int n = M->unmarked.n;
 	if (n == 0)
 		return;
-	M->unmarked.n = 0;
 	qsort(M->unmarked.index, n, sizeof(int64_t), int64_compr);
 
 	// remove alive and dup index
@@ -901,6 +900,8 @@ free_unmarked(struct math_context *M) {
 			}
 		}
 	}
+
+	M->unmarked.n = p;
 
 	if (p == 0)
 		return;
@@ -932,6 +933,8 @@ free_unmarked(struct math_context *M) {
 	}
 	*list_next = NULL;
 	math_unmarked_deinit(&tmp);
+
+	M->unmarked.n = 0;
 }
 
 void
