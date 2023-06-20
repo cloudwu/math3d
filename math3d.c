@@ -136,6 +136,7 @@ get_id_api(lua_State *L, struct math_context *M, int index) {
 static int
 lref(lua_State *L) {
 	struct math_context *M = GETMC(L);
+	math_refcount(M, 1);
 	lua_settop(L, 1);
 	struct refobject * R = (struct refobject *)lua_newuserdatauv(L, sizeof(struct refobject), 0);
 	if (lua_isnil(L, 1)) {
@@ -651,7 +652,9 @@ lserialize(lua_State *L) {
 static int
 lref_gc(lua_State *L) {
 	struct refobject *R = lua_touserdata(L, 1);
-	unmark_check(GETMC(L), R->id);
+	struct math_context *M = GETMC(L);
+	unmark_check(M, R->id);
+	math_refcount(M, -1);
 	R->id = MATH_NULL;
 	return 0;
 }
@@ -2427,6 +2430,8 @@ linfo(lua_State *L) {
 		w = MATH_INFO_MARKED;
 	} else if (strcmp(what, "constant") == 0) {
 		w = MATH_INFO_CONSTANT;
+	} else if (strcmp(what, "ref") == 0) {
+		w = MATH_INFO_REF;
 	} else if (strcmp(what, "maxpage") == 0) {
 		w = MATH_INFO_MAXPAGE;
 	} else if (strcmp(what, "frame") == 0) {
@@ -2650,7 +2655,7 @@ math3d_object(lua_State *L, int maxpage) {
 	// init reobject meta table, it's upvalue 2 of .ref
 	lua_pushvalue(L, refmeta);
 	lua_pushlightuserdata(L, M);
-	luaL_setfuncs(L,ref_mt, 1);
+	luaL_setfuncs(L, ref_mt, 1);
 
 	lua_pushcclosure(L, lref, 2);
 	lua_setfield(L, -2, "ref");

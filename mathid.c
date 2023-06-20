@@ -57,6 +57,7 @@ struct math_context {
 	int marked_page;
 	int marked_n;
 	int constant_n;
+	int ref_n;
 	uint32_t flags;
 };
 
@@ -80,9 +81,16 @@ math_info(struct math_context *M, int what) {
 			return M->marked_n;
 		case MATH_INFO_CONSTANT:
 			return M->constant_n;
+		case MATH_INFO_REF:
+			return M->ref_n;
 		default:
 			return -1;
 	}
+}
+
+void
+math_refcount(struct math_context *M, int delta) {
+	M->ref_n += delta;
 }
 
 static inline int
@@ -129,6 +137,7 @@ math_new(int maxpage) {
 	memset(m->p, 0, sizeof(struct pages) * maxpage);
 	m->marked_n = 0;
 	m->constant_n = 0;
+	m->ref_n = 0;
 	m->flags = 0;
 	m->base = 0;
 	m->top = 0;

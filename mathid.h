@@ -22,6 +22,7 @@ static const math_t MATH_NULL = { 0 };
 #define MATH_INFO_MARKED 3
 #define MATH_INFO_LAST 4
 #define MATH_INFO_CONSTANT 5
+#define MATH_INFO_REF 6
 
 struct math_context * math_new(int maxpage);
 void math_delete(struct math_context *);
@@ -46,6 +47,7 @@ void math_print(struct math_context *, math_t id);	// for debug only
 const char * math_typename(int type);
 math_t math_constant(struct math_context *, math_t);
 math_t math_live(struct math_context *, math_t id);
+void math_refcount(struct math_context *, int delta);
 
 static inline int
 math_issame(math_t id1, math_t id2) {
