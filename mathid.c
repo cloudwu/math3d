@@ -747,8 +747,8 @@ math_unmark_index_(int64_t handle, int *size) {
 	return (int)(handle >> 32);
 }
 
-static void
-math_unmarked_insert(struct math_unmarked *u, struct math_id id) {
+static inline void
+math_unmarked_insert_(struct math_unmarked *u, int64_t idx) {
 	if (u->n >= u->cap) {
 		int newcap = u->cap * 3 / 2;
 		int64_t *newindex = (int64_t *)malloc(newcap * sizeof(int64_t));
@@ -759,7 +759,12 @@ math_unmarked_insert(struct math_unmarked *u, struct math_id id) {
 		u->index = newindex;
 		u->cap = newcap;
 	}
-	u->index[u->n++] = math_unmark_handle_(id);
+	u->index[u->n++] = idx;
+}
+
+static void
+math_unmarked_insert(struct math_unmarked *u, struct math_id id) {
+	math_unmarked_insert_(u, math_unmark_handle_(id));
 }
 
 int
@@ -849,6 +854,27 @@ block_size(int64_t *ptr, int64_t *endptr, int *r_index, int *r_size) {
 }
 
 static void
+merge_freelist(struct math_context *M, struct math_unmarked *unmarked, const struct math_unmarked *u, struct marked_freelist *freelist) {
+	int i = 0;
+	while (freelist) {
+		int page_id = freelist->page;
+		int index = ((float *)freelist - &M->p[page_id].marked->v[0][0]) / 4;
+		index += page_id * PAGE_SIZE;
+		int64_t id = (int64_t)index << 32 | freelist->size;
+		while ( i < u->n && u->index[i] < id) {
+			math_unmarked_insert_(unmarked, u->index[i]);
+			++i;
+		}
+		math_unmarked_insert_(unmarked, id);
+		freelist = freelist->next;
+	}
+	while ( i < u->n ) {
+		math_unmarked_insert_(unmarked, u->index[i]);
+		++i;
+	}
+}
+
+static void
 free_unmarked(struct math_context *M) {
 	int n = M->unmarked.n;
 	if (n == 0)
@@ -879,18 +905,33 @@ free_unmarked(struct math_context *M) {
 	if (p == 0)
 		return;
 
-	int64_t *ptr = M->unmarked.index;
-	int64_t *endptr = M->unmarked.index + p;
+	struct math_unmarked tmp;
+	struct math_unmarked *unmarked;
+	math_unmarked_init(&tmp);
+	if (M->freelist) {
+		unmarked = &tmp;
+		merge_freelist(M, unmarked, &M->unmarked, M->freelist);
+	} else {
+		unmarked = &M->unmarked;
+	}
+
+	int64_t *ptr = unmarked->index;
+	int64_t *endptr = unmarked->index + unmarked->n;
+
+	struct marked_freelist **list_next = &M->freelist;
+
 	while (ptr < endptr) {
 		int index;
 		int sz;
 		ptr = block_size(ptr, endptr, &index, &sz);
 		struct marked_freelist * node = (struct marked_freelist *)get_marked(M, index);
-		node->next = M->freelist;
+		*list_next = node;
+		list_next = &node->next;
 		node->size = sz;
 		node->page = index / PAGE_SIZE;
-		M->freelist = node;
 	}
+	*list_next = NULL;
+	math_unmarked_deinit(&tmp);
 }
 
 void
