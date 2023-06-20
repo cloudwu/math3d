@@ -44,9 +44,7 @@ struct pages {
 
 struct math_context {
 	struct pages *p;
-	struct math_unmarked unmarked_a;
-	struct math_unmarked unmarked_b;
-	struct math_unmarked *unmarked;
+	struct math_unmarked unmarked;
 	struct marked_freelist *freelist;
 	int maxpage;
 	int frame;
@@ -141,9 +139,7 @@ math_new(int maxpage) {
 	m->flags = 0;
 	m->base = 0;
 	m->top = 0;
-	math_unmarked_init(&m->unmarked_a);
-	math_unmarked_init(&m->unmarked_b);
-	m->unmarked = &m->unmarked_a;
+	math_unmarked_init(&m->unmarked);
 	return m;
 }
 
@@ -190,8 +186,7 @@ math_delete(struct math_context *M) {
 		}
 		free(M->p[i].count);
 	}
-	math_unmarked_deinit(&M->unmarked_a);
-	math_unmarked_deinit(&M->unmarked_b);
+	math_unmarked_deinit(&M->unmarked);
 	free(M->p);
 	free(M);
 }
@@ -225,8 +220,7 @@ math_memsize(struct math_context *M) {
 		}
 		sz += sizeof(struct marked_count);
 	}
-	sz += math_unmarked_size(&M->unmarked_a);
-	sz += math_unmarked_size(&M->unmarked_b);
+	sz += math_unmarked_size(&M->unmarked);
 	return sz;
 }
 
@@ -795,7 +789,7 @@ math_unmark(struct math_context *M, math_t id) {
 	assert(c > 0);
 	if (c == 1) {
 		// The last reference
-		math_unmarked_insert(M->unmarked, u.s);
+		math_unmarked_insert(&M->unmarked, u.s);
 	}
 	*count = c - 1;
 	return c;
@@ -820,7 +814,7 @@ math_premark(struct math_context *M, int type, int size) {
 	}
 	assert(vecsize + index <= PAGE_SIZE);
 	M->p[page_id].count->count[index] = 0;
-	math_unmarked_insert(M->unmarked, u.s);
+	math_unmarked_insert(&M->unmarked, u.s);
 	return u.id;
 }
 
@@ -856,28 +850,28 @@ block_size(int64_t *ptr, int64_t *endptr, int *r_index, int *r_size) {
 
 static void
 free_unmarked(struct math_context *M) {
-	int n = M->unmarked->n;
+	int n = M->unmarked.n;
 	if (n == 0)
 		return;
-	M->unmarked->n = 0;
-	qsort(M->unmarked->index, n, sizeof(int64_t), int64_compr);
+	M->unmarked.n = 0;
+	qsort(M->unmarked.index, n, sizeof(int64_t), int64_compr);
 
 	// remove alive and dup index
 	int i;
 	int p = 0;
 	int sz;
-	int last = math_unmark_index_(M->unmarked->index[0], &sz);
+	int last = math_unmark_index_(M->unmarked.index[0], &sz);
 	int page_id = last / PAGE_SIZE;
 	if (M->p[page_id].count->count[last % PAGE_SIZE] == 0) {
 		++p;
 	}
 	for (i=1;i<n;i++) {
-		int current = math_unmark_index_(M->unmarked->index[i], &sz);
+		int current = math_unmark_index_(M->unmarked.index[i], &sz);
 		if (current != last) {
 			last = current;
 			page_id = current / PAGE_SIZE;
 			if (M->p[page_id].count->count[current % PAGE_SIZE] == 0) {
-				M->unmarked->index[p++] = M->unmarked->index[i];
+				M->unmarked.index[p++] = M->unmarked.index[i];
 			}
 		}
 	}
@@ -885,8 +879,8 @@ free_unmarked(struct math_context *M) {
 	if (p == 0)
 		return;
 
-	int64_t *ptr = M->unmarked->index;
-	int64_t *endptr = M->unmarked->index + p;
+	int64_t *ptr = M->unmarked.index;
+	int64_t *endptr = M->unmarked.index + p;
 	while (ptr < endptr) {
 		int index;
 		int sz;
@@ -917,11 +911,6 @@ math_frame(struct math_context *M) {
 			break;
 		free(M->p[i].transient);
 		M->p[i].transient = NULL;
-	}
-	if (M->unmarked == &M->unmarked_a) {
-		M->unmarked = &M->unmarked_b;
-	} else {
-		M->unmarked = &M->unmarked_a;
 	}
 	free_unmarked(M);
 	M->top = M->base;
