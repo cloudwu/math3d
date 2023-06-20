@@ -23,6 +23,7 @@ static const math_t MATH_NULL = { 0 };
 #define MATH_INFO_LAST 4
 #define MATH_INFO_CONSTANT 5
 #define MATH_INFO_REF 6
+#define MATH_INFO_SLOT 7
 
 struct math_context * math_new(int maxpage);
 void math_delete(struct math_context *);

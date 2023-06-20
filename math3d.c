@@ -2432,6 +2432,8 @@ linfo(lua_State *L) {
 		w = MATH_INFO_CONSTANT;
 	} else if (strcmp(what, "ref") == 0) {
 		w = MATH_INFO_REF;
+	} else if (strcmp(what, "slot") == 0) {
+		w = MATH_INFO_SLOT;
 	} else if (strcmp(what, "maxpage") == 0) {
 		w = MATH_INFO_MAXPAGE;
 	} else if (strcmp(what, "frame") == 0) {

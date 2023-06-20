@@ -54,6 +54,7 @@ struct math_context {
 	int top;
 	int marked_page;
 	int marked_n;
+	int marked_slot;
 	int constant_n;
 	int ref_n;
 	uint32_t flags;
@@ -81,6 +82,8 @@ math_info(struct math_context *M, int what) {
 			return M->constant_n;
 		case MATH_INFO_REF:
 			return M->ref_n;
+		case MATH_INFO_SLOT:
+			return M->marked_slot;
 		default:
 			return -1;
 	}
@@ -134,6 +137,7 @@ math_new(int maxpage) {
 	m->p = (struct pages *)malloc(sizeof(struct pages) * maxpage);
 	memset(m->p, 0, sizeof(struct pages) * maxpage);
 	m->marked_n = 0;
+	m->marked_slot = 0;
 	m->constant_n = 0;
 	m->ref_n = 0;
 	m->flags = 0;
@@ -528,7 +532,6 @@ new_marked_page(struct math_context *M) {
 	node->next = M->freelist;
 	node->page = page;
 	node->size = PAGE_SIZE;
-	M->freelist = node;
 	return node;
 }
 
@@ -541,6 +544,7 @@ alloc_vecarray(struct math_context *M, int vecsize) {
 		struct marked_freelist *node = *prev;
 		if (node == NULL) {
 			node = new_marked_page(M);
+			*prev = node;
 		}
 		if (node->size < vecsize) {
 			prev = &node->next;
@@ -664,6 +668,8 @@ alloc_marked(struct math_context *M, const float *v, int type, int size) {
 	int vecsize = size;
 	if (type == MATH_TYPE_MAT)
 		vecsize *= 4;
+
+	M->marked_slot += vecsize;
 
 	int index = alloc_vecarray(M, vecsize);
 
@@ -889,10 +895,12 @@ free_unmarked(struct math_context *M) {
 	int page_id = last / PAGE_SIZE;
 	if (M->p[page_id].count->count[last % PAGE_SIZE] == 0) {
 		++p;
+		M->marked_slot -= sz;
 	}
 	for (i=1;i<n;i++) {
 		int current = math_unmark_index_(M->unmarked.index[i], &sz);
 		if (current != last) {
+			M->marked_slot -= sz;
 			last = current;
 			page_id = current / PAGE_SIZE;
 			if (M->p[page_id].count->count[current % PAGE_SIZE] == 0) {

@@ -466,13 +466,13 @@ do
 	print(math3d.tostring(tmp))
 end
 
+print("SLOT = ", math3d.info "slot")
 print("REF = ", math3d.info "ref")
 ref1 = nil
 ref2 = nil
 ref3 = nil
 collectgarbage "collect"
 print("REF = ", math3d.info "ref")
-
 print("N = ", math3d.info "transient")
 local m = math3d.marked_matrix { s = 1 , t = { 0,0,0 } }
 print(math3d.tostring(m))
@@ -491,6 +491,8 @@ do
 
 	print(math3d.tostring(math3d.vector(0,0,0)))
 end
+
+print("SLOT = ", math3d.info "slot")
 
 -- test live
 
