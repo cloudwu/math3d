@@ -4,8 +4,8 @@
 #include <assert.h>
 #include <inttypes.h>
 
-#define DEFAULT_MAX_PAGE 512
-#define PAGE_SIZE 1024
+#define DEFAULT_MAX_PAGE 256
+#define PAGE_SIZE 2048
 #define UNMARK_SIZE 1024
 
 struct page {
