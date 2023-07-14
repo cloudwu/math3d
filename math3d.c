@@ -1582,6 +1582,55 @@ lvec_abs(lua_State *L){
 }
 
 static int
+lpow(lua_State *L){
+	struct math_context *M = GETMC(L);
+	const math_t v = vector_from_index(L, M, 1);
+	const float *vv = math_value(M, v);
+
+	const math_t r = math_import(M, NULL, MATH_TYPE_VEC4, 1);
+	float* rv = math_init(M, r);
+
+	if (lua_isnoneornil(L, 2)){
+		for (uint8_t ii=0; ii<4; ++ii){
+			rv[ii] = (float)exp(vv[ii]);
+		}
+	} else {
+		const float base = (float)luaL_checknumber(L, 2);
+		for (uint8_t ii=0; ii<4; ++ii){
+			rv[ii] = (float)pow(base, vv[ii]);
+		}
+	}
+
+	lua_pushmath(L, r);
+	return 1;
+}
+
+static int
+llog(lua_State *L){
+	struct math_context *M = GETMC(L);
+	const math_t v = vector_from_index(L, M, 1);
+	const float *vv = math_value(M, v);
+
+	const math_t r = math_import(M, NULL, MATH_TYPE_VEC4, 1);
+	float* rv = math_init(M, r);
+
+	if (lua_isnoneornil(L, 2)){
+		for (uint8_t ii=0; ii<4; ++ii){
+			rv[ii] = (float)log(vv[ii]);
+		}
+	} else {
+		const float base = (float)luaL_checknumber(L, 2);
+		const float lbase = (float)log(base);
+		for (uint8_t ii=0; ii<4; ++ii){
+			rv[ii] = (float)log(vv[ii]) / lbase;
+		}
+	}
+
+	lua_pushmath(L, r);
+	return 1;
+}
+
+static int
 llerp(lua_State *L){
 	struct math_context *M = GETMC(L);
 
@@ -2525,6 +2574,8 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "vec_min", lvec_min},
 		{ "vec_max", lvec_max},
 		{ "vec_abs", lvec_abs},
+		{ "pow", lpow},
+		{ "log", llog},
 		{ "lerp", llerp},
 		{ "slerp", lslerp},
 		{ "quat2euler", lquat2euler},
