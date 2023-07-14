@@ -2177,31 +2177,6 @@ lpoint2plane(lua_State *L) {
 	return 1;
 }
 
-static int
-ladd(lua_State *L) {
-	struct math_context *M = GETMC(L);
-	int i;
-	int top = lua_gettop(L);
-	if (top < 2) {
-		return luaL_error(L, "Need 2 or more vectors");
-	}
-	math_t result = vector_from_index(L, M, 1);
-	for (i=2;i<=top;i++) {
-		result = math3d_add_vec(M, result, vector_from_index(L, M, i));
-	}
-	lua_pushmath(L, result);
-	return 1;
-}
-
-static int
-lsub(lua_State *L) {
-	struct math_context *M = GETMC(L);
-	math_t r = math3d_sub_vec(M, vector_from_index(L, M, 1), vector_from_index(L, M, 2));
-	lua_pushmath(L, r);
-
-	return 1;
-}
-
 static math_t
 get_vec_or_number(lua_State *L, struct math_context *M, int index) {
 	if (lua_type(L, index) == LUA_TNUMBER) {
@@ -2214,6 +2189,35 @@ get_vec_or_number(lua_State *L, struct math_context *M, int index) {
 	} else {
 		return vector_from_index(L, M, index);
 	}
+}
+
+static int
+ladd(lua_State *L) {
+	struct math_context *M = GETMC(L);
+	int i;
+	int top = lua_gettop(L);
+	if (top < 2) {
+		return luaL_error(L, "Need 2 or more vectors");
+	}
+	math_t result = get_vec_or_number(L, M, 1);
+	for (i=2;i<=top;i++) {
+		result = math3d_add_vec(M, result, get_vec_or_number(L, M, i));
+	}
+	lua_pushmath(L, result);
+	return 1;
+}
+
+static int
+lsub(lua_State *L) {
+	struct math_context *M = GETMC(L);
+	int top = lua_gettop(L);
+	if (top < 2) {
+		return luaL_error(L, "Need 2 or more vectors");
+	}
+	math_t r = math3d_sub_vec(M, get_vec_or_number(L, M, 1), get_vec_or_number(L, M, 2));
+	lua_pushmath(L, r);
+
+	return 1;
 }
 
 static int
