@@ -83,6 +83,22 @@ do
 	print("ref2", ref2)
 end
 
+print "-----pow&log-----"
+do
+	local v = math3d.vector(2, 2, 2, 1)
+	local ev = math3d.pow(v)	--result : (e^2, e^2, e^2, e^1)
+	print("pow(v) with e base:", math3d.tostring(ev))
+
+	local v3 = math3d.pow(v, 3)	-- result : (3^2, 3^2, 3^2, 1^2)
+	print("pow(v, 3):", math3d.tostring(v3))
+
+	local lev = math3d.log(ev)	-- result: (loge(e^2), loge(e^2), loge(e^2), loge(e^1)) = (2, 2, 2, 1)
+	print("log(ev) with e base:", math3d.tostring(lev))
+
+	local vv = math3d.log(v3, 3)
+	print("log(v3, 3):", math3d.tostring(vv))
+end
+
 print "-----plane test-----"
 do
 	--[[
