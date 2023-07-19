@@ -2332,7 +2332,10 @@ static int
 lvalue_ptr(lua_State *L){
 	struct math_context *M = GETMC(L);
 	math_t id = get_id(L, M, 1);
-	lua_pushlightuserdata(L, (void *)math_value(M, id));
+	void * ptr = (void *)math_value(M, id);
+	if (ptr == NULL)
+		return luaL_error(L, "Math null ptr");
+	lua_pushlightuserdata(L, ptr);
 	return 1;
 }
 
