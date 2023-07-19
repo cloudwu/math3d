@@ -83,6 +83,22 @@ do
 	print("ref2", ref2)
 end
 
+print "-----pow&log-----"
+do
+	local v = math3d.vector(2, 2, 2, 1)
+	local ev = math3d.pow(v)	--result : (e^2, e^2, e^2, e^1)
+	print("pow(v) with e base:", math3d.tostring(ev))
+
+	local v3 = math3d.pow(v, 3)	-- result : (3^2, 3^2, 3^2, 1^2)
+	print("pow(v, 3):", math3d.tostring(v3))
+
+	local lev = math3d.log(ev)	-- result: (loge(e^2), loge(e^2), loge(e^2), loge(e^1)) = (2, 2, 2, 1)
+	print("log(ev) with e base:", math3d.tostring(lev))
+
+	local vv = math3d.log(v3, 3)
+	print("log(v3, 3):", math3d.tostring(vv))
+end
+
 print "-----plane test-----"
 do
 	--[[
@@ -151,6 +167,7 @@ do
 	ref2.v = math3d.add(ref2,ref2,ref2)
 	print(ref2)
 	ref2.v = math3d.mul(ref2, 2.5)
+	
 	print("length", ref2, "=", math3d.length(ref2))
 	print("floor", ref2, "=", math3d.tostring(math3d.floor(ref2)))
 	print("dot", ref2, ref2, "=", math3d.dot(ref2, ref2))
@@ -164,6 +181,9 @@ do
 	print("inverse", ref2, "=", math3d.tostring(math3d.inverse(ref2)))
 	print("inverse", ref3, "=", math3d.tostring(math3d.inverse(ref3)))
 	print("reciprocal", ref2, "=", math3d.tostring(math3d.reciprocal(ref2)))
+
+	print("add with number", math3d.tostring(math3d.add(1, math3d.vector(2, 2, 2), 3)))
+	print("sub with number", math3d.tostring(math3d.sub(1, math3d.vector(2, 2, 2))))
 end
 
 print "===INVERSE==="
