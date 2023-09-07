@@ -418,11 +418,11 @@ math_marked_next(struct math_context *M, struct math_marked_iter *iter) {
 		int page_id = index / PAGE_SIZE;
 		if (page_id >= M->marked_page)
 			return 0;
-		index %= PAGE_SIZE;
-		if (M->p[page_id].count->count[index] > 0) {
+		int page_index = index % PAGE_SIZE;
+		if (M->p[page_id].count->count[page_index] > 0) {
 			iter->iter = index+1;
-			iter->filename = M->p[page_id].count->filename[index];
-			iter->line = M->p[page_id].count->line[index];
+			iter->filename = M->p[page_id].count->filename[page_index];
+			iter->line = M->p[page_id].count->line[page_index];
 			return 1;
 		} else {
 			++index;
@@ -432,9 +432,9 @@ math_marked_next(struct math_context *M, struct math_marked_iter *iter) {
 
 #else
 
-math_t
+int
 math_marked_next(struct math_context *M, struct math_marked_iter *iter) {
-	return MATH_NULL;
+	return 0;
 }
 
 #endif
