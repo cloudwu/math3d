@@ -2540,7 +2540,7 @@ lmarked_list(lua_State *L) {
 	lua_newtable(L);
 	struct math_marked_iter iter;
 	memset(&iter, 0, sizeof(iter));
-	while (!math_isnull(math_marked_next(M, &iter))) {
+	while (math_marked_next(M, &iter)) {
 		const char * filename = iter.filename;
 		if (filename == NULL) {
 			filename = "UNKNOWN";

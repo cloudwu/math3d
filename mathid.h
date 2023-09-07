@@ -52,12 +52,12 @@ math_t math_mark_(struct math_context *, math_t id, const char *filename, int li
 #endif
 
 struct math_marked_iter {
-	math_t prev;
+	int iter;
 	const char *filename;
 	int line;
 };
 
-math_t math_marked_next(struct math_context *, struct math_marked_iter *iter);
+int math_marked_next(struct math_context *, struct math_marked_iter *iter);
 
 int math_unmark(struct math_context *, math_t id);
 const float * math_value(struct math_context *, math_t id);

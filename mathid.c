@@ -411,32 +411,19 @@ math_marked(struct math_context *M, math_t id) {
 
 #ifdef MATHIDSOURCE
 
-math_t
+int
 math_marked_next(struct math_context *M, struct math_marked_iter *iter) {
-	union {
-		math_t id;
-		struct math_id s;
-	} u;
-	u.id = iter->prev;
-	int index;
-	if (math_isnull(iter->prev)) {
-		index = 0;
-	} else if (u.s.transient || u.s.frame != 1) {
-		return MATH_NULL;
-	} else {
-		index = u.s.index + 1;
-	}
+	int index = iter->iter;
 	for (;;) {
 		int page_id = index / PAGE_SIZE;
 		if (page_id >= M->marked_page)
-			return MATH_NULL;
+			return 0;
 		index %= PAGE_SIZE;
 		if (M->p[page_id].count->count[index] > 0) {
-			u.s.index = index;
-			iter->prev = u.id;
+			iter->iter = index+1;
 			iter->filename = M->p[page_id].count->filename[index];
 			iter->line = M->p[page_id].count->line[index];
-			return u.id;
+			return 1;
 		} else {
 			++index;
 		}
