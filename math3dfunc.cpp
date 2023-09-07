@@ -33,6 +33,61 @@ static const glm::vec4 NXAXIS = -XAXIS;
 static const glm::vec4 NYAXIS = -YAXIS;
 static const glm::vec4 NZAXIS = -ZAXIS;
 
+static inline glm::mat4x4
+perspectiveLH_ZO_INFF(float fovy, float aspect, float zNear, float zFar, int inv_z){
+	assert(abs(aspect - std::numeric_limits<float>::epsilon()) > 0);
+	const float tanHalfFovy = tan(fovy / 2);
+	glm::mat4x4 Result(0);
+	Result[0][0] = 1 / (aspect * tanHalfFovy);
+	Result[1][1] = 1 / (tanHalfFovy);
+	Result[2][3] = 1;
+	if(inv_z){
+		Result[2][2] = -std::numeric_limits<float>::epsilon();
+		Result[3][2] = zFar;
+	}
+	else{
+		Result[2][2] = 1;
+		Result[3][2] = -zNear;
+	}
+	return Result;
+}
+
+static inline glm::mat4x4
+orthoLH_ZO_INFF(float left, float right, float bottom, float top, float near, float far, int inv_z){
+	glm::mat4x4 Result(1);
+	Result[0][0] = 2 / (right - left);
+	Result[1][1] = 2 / (top - bottom);
+	Result[2][2] = 0;
+	Result[3][0] = - (right + left) / (right - left);
+	Result[3][1] = - (top + bottom) / (top - bottom);
+	if(inv_z){
+		Result[3][2] = 1;
+	}
+	else{
+		Result[3][2] = 0;
+	}
+	return Result;
+}
+
+static inline glm::mat4x4
+frustumLH_ZO_INFF(float left, float right, float bottom, float top, float nearVal, float farVal, int inv_z){
+	glm::mat4x4 Result(0);
+	Result[0][0] = 2 * nearVal / (right - left);
+	Result[1][1] = 2 * nearVal / (top - bottom);
+	Result[2][0] = (right + left) / (right - left);
+	Result[2][1] = (top + bottom) / (top - bottom);
+	Result[2][3] = 1;
+	if(inv_z){
+		Result[2][2] = 0;
+		Result[3][2] = farVal;
+	}
+	else{
+		Result[2][2] = 1;
+		Result[3][2] = -nearVal;
+	}
+	return Result;
+}
+
 template<typename T>
 inline bool
 is_zero(const T& a, const T& e = T(glm::epsilon<float>())) {
@@ -606,6 +661,30 @@ math3d_lookat_matrix(struct math_context *M, int direction, math_t eye, math_t a
 	} else {
 		m = glm::lookAtLH(eyev, VEC3(M, at), *(const glm::vec3 *)(up));
 	}
+	return id;
+}
+
+math_t
+math3d_perspectiveLH_INFF(struct math_context *M, float fovy, float aspect, float zNear, float zFar, int inv_z) {
+	math_t id;
+	glm::mat4x4 &mat = allocmat(M, &id);
+	mat = perspectiveLH_ZO_INFF(fovy, aspect, zNear, zFar, inv_z);
+	return id;
+}
+
+math_t
+math3d_orthoLH_INFF(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z) {
+	math_t id;
+	glm::mat4x4 &mat = allocmat(M, &id);
+	mat = orthoLH_ZO_INFF(left, right, bottom, top, near, far, inv_z);
+	return id;
+}
+
+math_t 
+math3d_frustumLH_INFF(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z){
+	math_t id;
+	glm::mat4x4 &mat = allocmat(M, &id);
+	mat = frustumLH_ZO_INFF(left, right, bottom, top, near, far, inv_z);
 	return id;
 }
 
