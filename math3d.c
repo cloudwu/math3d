@@ -1436,7 +1436,7 @@ read_number(lua_State *L, int index, const char* n, float opt){
 }
 
 static math_t
-create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z) {
+create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z, int inf_f) {
 	const char* nn, *ff;
 	if (inv_z) {nn="f"; ff="n";}
 	else { nn="n"; ff="f";}
@@ -1453,7 +1453,10 @@ create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z) {
 		fov *= (float)M_PI / 180.f;
 
 		const float aspect = read_number(L, index, "aspect", 1.f);
-		return math3d_perspectiveLH(M, fov, aspect, near, far, homogeneous_depth);
+		if(inf_f)
+			return math3d_perspectiveLH_INFF(M, fov, aspect, near, far, inv_z);
+		else
+			return math3d_perspectiveLH(M, fov, aspect, near, far, homogeneous_depth);
 	} else {
 		lua_pop(L, 1); //pop "fov"
 
@@ -1467,9 +1470,15 @@ create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z) {
 		int ortho = lua_toboolean(L, -1);
 		lua_pop(L, 1);
 		if (ortho)
-			return math3d_orthoLH(M, left, right, bottom, top, near, far, homogeneous_depth);
+			if(inf_f)
+				return math3d_orthoLH_INFF(M, left, right, bottom, top, near, far, inv_z);
+			else
+				return math3d_orthoLH(M, left, right, bottom, top, near, far, homogeneous_depth); 
 		else
-			return math3d_frustumLH(M, left, right, bottom, top, near, far, homogeneous_depth);
+			if(inf_f)
+				return math3d_frustumLH_INFF(M, left, right, bottom, top, near, far, inv_z);
+			else
+				return math3d_frustumLH(M, left, right, bottom, top, near, far, homogeneous_depth);
 	}
 }
 
@@ -1478,7 +1487,8 @@ lprojmat(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	luaL_checktype(L, 1, LUA_TTABLE);
 	const int inv_z = lua_isnoneornil(L, 2) ? 0 : lua_toboolean(L, 2);
-	lua_pushmath(L, create_proj_mat(L, M, 1, inv_z));
+	const int inf_f = lua_isnoneornil(L, 3) ? 0 : lua_toboolean(L, 3);
+	lua_pushmath(L, create_proj_mat(L, M, 1, inv_z, inf_f));
 	return 1;
 }
 

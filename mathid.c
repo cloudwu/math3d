@@ -274,6 +274,7 @@ allocvec(struct math_context *M, int size, int *index) {
 	*index = n;
 	M->n = n + size;
 	if (rewind) {
+		// transient pages overflow, too mant trabsient vectors
 		assert(M->n < M->top);
 	}
 	return M->p[page_id].transient->v[*index % PAGE_SIZE];
