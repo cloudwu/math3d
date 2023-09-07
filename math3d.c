@@ -2524,6 +2524,35 @@ llive(lua_State *L) {
 	return 1;
 }
 
+static int
+lmarked_list(lua_State *L) {
+	struct math_context * M = GETMC(L);
+	lua_newtable(L);
+	struct math_marked_iter iter;
+	memset(&iter, 0, sizeof(iter));
+	while (!math_isnull(math_marked_next(M, &iter))) {
+		const char * filename = iter.filename;
+		if (filename == NULL) {
+			filename = "UNKNOWN";
+		}
+		lua_pushfstring(L, "%s:%d", filename, iter.line);
+		lua_pushvalue(L, -1);
+		// table source source
+		if (lua_rawget(L, -3) == LUA_TNIL) {
+			// table source nil
+			lua_pop(L, 1);
+			lua_pushinteger(L, 1);
+			// table source 1
+		} else {
+			int n = lua_tointeger(L, -1);
+			lua_pop(L, 1);
+			lua_pushinteger(L, n + 1);
+		}
+		lua_rawset(L, -3);
+	}
+	return 1;
+}
+
 static void
 init_math3d_api(lua_State *L, struct math3d_api *M) {
 	luaL_Reg l[] = {
@@ -2640,6 +2669,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "checkpoint", lcheckpoint },
 		{ "recover", lrecover },
 		{ "live", llive },
+		{ "marked_list", lmarked_list },
 
 		{ "CINTERFACE", NULL },
 		{ "_COBJECT", NULL },

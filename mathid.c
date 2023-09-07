@@ -13,7 +13,11 @@ struct page {
 };
 
 struct marked_count {
-	uint8_t count[PAGE_SIZE];	
+	uint8_t count[PAGE_SIZE];
+#ifdef MATHIDSOURCE
+	const char * filename[PAGE_SIZE];
+	int line[PAGE_SIZE];
+#endif
 };
 
 struct marked_freelist {
@@ -404,6 +408,49 @@ math_marked(struct math_context *M, math_t id) {
 	return M->p[page_id].count->count[index] > 0;
 }
 
+#ifdef MATHIDSOURCE
+
+math_t
+math_marked_next(struct math_context *M, struct math_marked_iter *iter) {
+	union {
+		math_t id;
+		struct math_id s;
+	} u;
+	u.id = iter->prev;
+	int index;
+	if (math_isnull(iter->prev)) {
+		index = 0;
+	} else if (u.s.transient || u.s.frame != 1) {
+		return MATH_NULL;
+	} else {
+		index = u.s.index + 1;
+	}
+	for (;;) {
+		int page_id = index / PAGE_SIZE;
+		if (page_id >= M->marked_page)
+			return MATH_NULL;
+		index %= PAGE_SIZE;
+		if (M->p[page_id].count->count[index] > 0) {
+			u.s.index = index;
+			iter->prev = u.id;
+			iter->filename = M->p[page_id].count->filename[index];
+			iter->line = M->p[page_id].count->line[index];
+			return u.id;
+		} else {
+			++index;
+		}
+	}
+}
+
+#else
+
+math_t
+math_marked_next(struct math_context *M, struct math_marked_iter *iter) {
+	return MATH_NULL;
+}
+
+#endif
+
 static float *
 get_marked(struct math_context *M, int index) {
 	int page_id = index / PAGE_SIZE;
@@ -659,7 +706,7 @@ math_constant(struct math_context *M, math_t v) {
 }
 
 static math_t
-alloc_marked(struct math_context *M, const float *v, int type, int size) {
+alloc_marked(struct math_context *M, const float *v, int type, int size, const char *filename, int line) {
 	union {
 		math_t id;
 		struct math_id s;
@@ -687,13 +734,16 @@ alloc_marked(struct math_context *M, const float *v, int type, int size) {
 	int page_id = index / PAGE_SIZE;
 	index %= PAGE_SIZE;
 	M->p[page_id].count->count[index] = 1;
-
+#ifdef MATHIDSOURCE
+	M->p[page_id].count->filename[index] = filename;
+	M->p[page_id].count->line[index] = line;
+#endif
 	return u.id;
 }
 
 
 static math_t
-get_marked_id(struct math_context *M, math_t id) {
+get_marked_id(struct math_context *M, math_t id, const char *filename, int line) {
 	union {
 		math_t id;
 		struct math_id s;
@@ -707,7 +757,7 @@ get_marked_id(struct math_context *M, math_t id) {
 	if (count == 255) {
 		const float *v = math_value(M, id);
 		int size = math_size(M, id);
-		return alloc_marked(M, v, u.s.type, size);
+		return alloc_marked(M, v, u.s.type, size, filename, line);
 	} else {
 		// add reference count
 		++M->p[page_id].count->count[index];
@@ -716,7 +766,7 @@ get_marked_id(struct math_context *M, math_t id) {
 }
 
 math_t
-math_mark(struct math_context *M, math_t id) {
+math_mark_(struct math_context *M, math_t id, const char *filename, int line) {
 	union {
 		math_t id;
 		struct math_id s;
@@ -727,14 +777,14 @@ math_mark(struct math_context *M, math_t id) {
 		int size = math_size(M, id);
 		int type = math_type(M, id);
 		M->marked_n++;
-		return alloc_marked(M, v, type, size);
+		return alloc_marked(M, v, type, size, filename, line);
 	}
 	if (u.s.frame == 0) {
 		// constant value
 		return id;
 	}
 	M->marked_n++;
-	return get_marked_id(M, id);
+	return get_marked_id(M, id, filename, line);
 }
 
 static inline int64_t
@@ -812,7 +862,7 @@ math_premark(struct math_context *M, int type, int size) {
 		math_t id;
 		struct math_id s;
 	} u;
-	u.id = alloc_marked(M, NULL, type, size);
+	u.id = alloc_marked(M, NULL, type, size, "PREMARK", 0);
 
 	int index = u.s.index;
 	int page_id = index / PAGE_SIZE;

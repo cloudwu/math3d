@@ -1,6 +1,8 @@
 #ifndef MATH_ID_H
 #define MATH_ID_H
 
+// #define MATHIDSOURCE
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -37,7 +39,26 @@ void math_recover(struct math_context *, int cp);
 math_t math_import(struct math_context *, const float *v, int type, int size);
 math_t math_ref(struct math_context *, const float *v, int type, int size);
 math_t math_premark(struct math_context *, int type, int size);
-math_t math_mark(struct math_context *, math_t id);
+math_t math_mark_(struct math_context *, math_t id, const char *filename, int line);
+
+#ifdef MATHIDSOURCE
+
+#define math_mark(M, id) math_mark_(M, id, __FILE__, __LINE__)
+
+#else
+
+#define math_mark(M, id) math_mark_(M, id, NULL, 0)
+
+#endif
+
+struct math_marked_iter {
+	math_t prev;
+	const char *filename;
+	int line;
+};
+
+math_t math_marked_next(struct math_context *, struct math_marked_iter *iter);
+
 int math_unmark(struct math_context *, math_t id);
 const float * math_value(struct math_context *, math_t id);
 float *math_init(struct math_context *, math_t id);
