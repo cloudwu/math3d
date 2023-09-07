@@ -723,12 +723,11 @@ alloc_marked(struct math_context *M, const float *v, int type, int size, const c
 	index %= PAGE_SIZE;
 	M->p[page_id].count->count[index] = 1;
 #ifdef MATHIDSOURCE
-	M->p[page_id].count->filename[index] = filename;
+	M->p[page_id].count->filename[index] = (filename != NULL) ? filename : "(null)";
 	M->p[page_id].count->line[index] = line;
 #endif
 	return u.id;
 }
-
 
 static math_t
 get_marked_id(struct math_context *M, math_t id, const char *filename, int line) {
@@ -749,6 +748,9 @@ get_marked_id(struct math_context *M, math_t id, const char *filename, int line)
 	} else {
 		// add reference count
 		++M->p[page_id].count->count[index];
+#ifdef MATHIDSOURCE
+		assert(M->p[page_id].count->filename[index] != NULL);
+#endif
 		return id;
 	}
 }
