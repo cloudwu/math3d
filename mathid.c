@@ -748,9 +748,6 @@ get_marked_id(struct math_context *M, math_t id, const char *filename, int line)
 	} else {
 		// add reference count
 		++M->p[page_id].count->count[index];
-#ifdef MATHIDSOURCE
-		assert(M->p[page_id].count->filename[index] != NULL);
-#endif
 		return id;
 	}
 }
