@@ -68,6 +68,5 @@ math_t math3d_frustum_points(struct math_context *, math_t m, int homogeneous_de
 void math3d_frustum_calc_near_far(struct math_context *, math_t planes, float result[2]); // return { near, far }
 float math3d_point2plane(struct math_context *, math_t pt, math_t plane);
 math_t math3d_perspectiveLH_INFF(struct math_context *M, float fovy, float aspect, float zNear, float zFar, int inv_z);
-math_t math3d_orthoLH_INFF(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z);
 math_t math3d_frustumLH_INFF(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z);
 #endif

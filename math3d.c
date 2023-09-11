@@ -1470,10 +1470,7 @@ create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z, int 
 		int ortho = lua_toboolean(L, -1);
 		lua_pop(L, 1);
 		if (ortho)
-			if(inf_f)
-				return math3d_orthoLH_INFF(M, left, right, bottom, top, near, far, inv_z);
-			else
-				return math3d_orthoLH(M, left, right, bottom, top, near, far, homogeneous_depth); 
+			math3d_orthoLH(M, left, right, bottom, top, near, far, homogeneous_depth); 		
 		else
 			if(inf_f)
 				return math3d_frustumLH_INFF(M, left, right, bottom, top, near, far, inv_z);
