@@ -37,9 +37,9 @@ math_t math3d_rotmat_transform(struct math_context *, math_t mat, math_t v);
 math_t math3d_mulH(struct math_context *, math_t mat, math_t v);
 math_t math3d_reciprocal(struct math_context *, math_t v);
 math_t math3d_lookat_matrix(struct math_context *, int dir, math_t eye, math_t at, math_t up);
-math_t math3d_perspectiveLH(struct math_context *M, float fov, float aspect, float near, float far, int homogeneous_depth);
-math_t math3d_frustumLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int homogeneous_depth);
-math_t math3d_orthoLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int homogeneous_depth);
+math_t math3d_perspectiveLH(struct math_context *M, float fov, float aspect, float near, float far, int inv_z, int inf_f, int homogeneous_depth);
+math_t math3d_frustumLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z, int inf_f, int homogeneous_depth);
+math_t math3d_orthoLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z, int homogeneous_depth);
 math_t math3d_base_axes(struct math_context *M, math_t forward);	// return { right , up }
 math_t math3d_quat_to_viewdir(struct math_context *, math_t quat);
 math_t math3d_rotmat_to_viewdir(struct math_context *, math_t mat);
@@ -67,6 +67,4 @@ int math3d_frustum_intersect_aabb(struct math_context *, math_t planes, math_t a
 math_t math3d_frustum_points(struct math_context *, math_t m, int homogeneous_depth);	// return vec4[8]
 void math3d_frustum_calc_near_far(struct math_context *, math_t planes, float result[2]); // return { near, far }
 float math3d_point2plane(struct math_context *, math_t pt, math_t plane);
-math_t math3d_perspectiveLH_INFF(struct math_context *M, float fovy, float aspect, float zNear, float zFar, int inv_z);
-math_t math3d_frustumLH_INFF(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z);
 #endif

@@ -34,8 +34,27 @@ static const glm::vec4 NYAXIS = -YAXIS;
 static const glm::vec4 NZAXIS = -ZAXIS;
 
 static inline glm::mat4x4
+perspectiveLH_NO_INFF(float fovy, float aspect, float zNear, float zFar, int inv_z){
+  assert(abs(aspect - glm::epsilon<float>()) > 0);
+  const float tanHalfFovy = tan(fovy / 2);
+  glm::mat4x4 Result(0);
+  Result[0][0] = 1 / (aspect * tanHalfFovy);
+  Result[1][1] = 1 / (tanHalfFovy);
+  Result[2][3] = 1;
+  if(inv_z){
+    Result[2][2] = -1;
+    Result[3][2] = 2 * zFar;
+  }
+  else{
+    Result[2][2] = 1;
+    Result[3][2] = -2 * zNear;
+  }
+  return Result;
+}
+
+static inline glm::mat4x4
 perspectiveLH_ZO_INFF(float fovy, float aspect, float zNear, float zFar, int inv_z){
-	assert(abs(aspect - std::numeric_limits<float>::epsilon()) > 0);
+	assert(abs(aspect - glm::epsilon<float>()) > 0);
 	const float tanHalfFovy = tan(fovy / 2);
 	glm::mat4x4 Result(0);
 	Result[0][0] = 1 / (aspect * tanHalfFovy);
@@ -50,6 +69,25 @@ perspectiveLH_ZO_INFF(float fovy, float aspect, float zNear, float zFar, int inv
 		Result[3][2] = -zNear;
 	}
 	return Result;
+}
+
+static inline glm::mat4x4
+frustumLH_NO_INFF(float left, float right, float bottom, float top, float nearVal, float farVal, int inv_z){
+  glm::mat4x4 Result(0);
+  Result[0][0] = 2 * nearVal / (right - left);
+  Result[1][1] = 2 * nearVal / (top - bottom);
+  Result[2][0] = (right + left) / (right - left);
+  Result[2][1] = (top + bottom) / (top - bottom);
+  Result[2][3] = 1;
+  if(inv_z){
+    Result[2][2] = -1;
+    Result[3][2] = 2 * farVal;
+  }
+  else{
+    Result[2][2] = 1;
+    Result[3][2] = -2 * nearVal;
+  }
+  return Result;
 }
 
 static inline glm::mat4x4
@@ -648,44 +686,49 @@ math3d_lookat_matrix(struct math_context *M, int direction, math_t eye, math_t a
 }
 
 math_t
-math3d_perspectiveLH_INFF(struct math_context *M, float fovy, float aspect, float zNear, float zFar, int inv_z) {
-	math_t id;
-	glm::mat4x4 &mat = allocmat(M, &id);
-	mat = perspectiveLH_ZO_INFF(fovy, aspect, zNear, zFar, inv_z);
-	return id;
-}
-
-math_t 
-math3d_frustumLH_INFF(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z){
-	math_t id;
-	glm::mat4x4 &mat = allocmat(M, &id);
-	mat = frustumLH_ZO_INFF(left, right, bottom, top, near, far, inv_z);
-	return id;
-}
-
-math_t
-math3d_perspectiveLH(struct math_context *M, float fov, float aspect, float near, float far, int homogeneous_depth) {
-	math_t id;
-	glm::mat4x4 &mat = allocmat(M, &id);
+math3d_perspectiveLH(struct math_context *M, float fov, float aspect, float near, float far, int inv_z, int inf_f, int homogeneous_depth) {
+  math_t id;
+  if(inv_z){
+	std::swap(near, far);
+  }
+  glm::mat4x4 &mat = allocmat(M, &id);
+  if(inf_f){
+	mat = homogeneous_depth ?
+		perspectiveLH_NO_INFF(fov, aspect, near, far, inv_z) :
+		perspectiveLH_ZO_INFF(fov, aspect, near, far, inv_z);  
+  }else{
 	mat = homogeneous_depth ?
 		glm::perspectiveLH_NO(fov, aspect, near, far) :
 		glm::perspectiveLH_ZO(fov, aspect, near, far);
-	return id;
+  }
+  return id;
 }
 
 math_t
-math3d_frustumLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int homogeneous_depth) {
-	math_t id;
-	glm::mat4x4 &mat = allocmat(M, &id);
+math3d_frustumLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z, int inf_f, int homogeneous_depth) {
+  math_t id;
+  if(inv_z){
+	std::swap(near, far);
+  }
+  glm::mat4x4 &mat = allocmat(M, &id);
+  if(inf_f){
+	mat = homogeneous_depth ?
+		frustumLH_NO_INFF(left, right, bottom, top, near, far, inv_z) :
+		frustumLH_ZO_INFF(left, right, bottom, top, near, far, inv_z);  
+  }else{
 	mat = homogeneous_depth ?
 		glm::frustumLH_NO(left, right, bottom, top, near, far) :
 		glm::frustumLH_ZO(left, right, bottom, top, near, far);
-	return id;
+  }
+  return id;
 }
 
 math_t
-math3d_orthoLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int homogeneous_depth) {
+math3d_orthoLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z, int homogeneous_depth) {
 	math_t id;
+	if(inv_z){
+		std::swap(near, far);
+	}
 	glm::mat4x4 &mat = allocmat(M, &id);
 	mat = homogeneous_depth ?
 		glm::orthoLH_NO(left, right, bottom, top, near, far) :
