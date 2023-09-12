@@ -1440,7 +1440,7 @@ create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z, int 
 	const float near = read_number(L, index, "n", 0.1f);
 	const float far = read_number(L, index, "f", 100.f);
 
-	int homogeneous_depth = 1;
+	int homogeneous_depth = math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH);
 
 	if (lua_getfield(L, index, "fov") == LUA_TNUMBER) {
 		float fov = (float)lua_tonumber(L, -1);
