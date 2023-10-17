@@ -8,6 +8,7 @@
 #define DEFAULT_MAX_PAGE 256
 #define PAGE_SIZE 2048
 #define UNMARK_SIZE 1024
+#define INVALID_MARK_COUNT 255
 
 struct page {
 	float v[PAGE_SIZE][4];
@@ -742,7 +743,8 @@ get_marked_id(struct math_context *M, math_t id, const char *filename, int line)
 	index %= PAGE_SIZE;
 	assert (page_id < M->marked_page);
 	int count = M->p[page_id].count->count[index];
-	if (count == 255) {
+	if (count >= (INVALID_MARK_COUNT-1)) {
+		assert(count != INVALID_MARK_COUNT);	// unmarked id
 		const float *v = math_value(M, id);
 		int size = math_size(M, id);
 		return alloc_marked(M, v, u.s.type, size, filename, line);
@@ -835,7 +837,7 @@ math_unmark(struct math_context *M, math_t id) {
 	assert(vecsize + index <= PAGE_SIZE);
 	uint8_t * count = &M->p[page_id].count->count[index];
 	int c = *count;
-	assert(c > 0);
+	assert(c != INVALID_MARK_COUNT);
 	if (c == 1) {
 		// The last reference
 		math_unmarked_insert(&M->unmarked, u.s);
@@ -941,7 +943,9 @@ free_unmarked(struct math_context *M) {
 	int sz;
 	int last = math_unmark_index_(M->unmarked.index[0], &sz);
 	int page_id = last / PAGE_SIZE;
-	if (M->p[page_id].count->count[last % PAGE_SIZE] == 0) {
+	uint8_t *count = &M->p[page_id].count->count[last % PAGE_SIZE];
+	if (*count == 0) {
+		*count = INVALID_MARK_COUNT;
 		++p;
 		M->marked_slot -= sz;
 	}
@@ -951,7 +955,9 @@ free_unmarked(struct math_context *M) {
 			M->marked_slot -= sz;
 			last = current;
 			page_id = current / PAGE_SIZE;
-			if (M->p[page_id].count->count[current % PAGE_SIZE] == 0) {
+			uint8_t *count = &M->p[page_id].count->count[current % PAGE_SIZE];
+			if (*count == 0) {
+				*count = INVALID_MARK_COUNT;
 				M->unmarked.index[p++] = M->unmarked.index[i];
 			}
 		}
