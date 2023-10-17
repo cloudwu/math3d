@@ -1,4 +1,5 @@
 #include "mathid.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -917,6 +918,16 @@ merge_freelist(struct math_context *M, struct math_unmarked *unmarked, const str
 	}
 }
 
+static inline void
+dump_unmarked(struct math_unmarked *unmarked) {
+	int i;
+	for (i=0;i<unmarked->n;i++) {
+		uint64_t v = unmarked->index[i];
+		printf("(%d/%d)", (int)(v>>32), (int)(v & 0xffffffff));
+	}
+	printf("\n");
+}
+
 static void
 free_unmarked(struct math_context *M) {
 	int n = M->unmarked.n;
@@ -960,6 +971,8 @@ free_unmarked(struct math_context *M) {
 	} else {
 		unmarked = &M->unmarked;
 	}
+
+//	dump_unmarked(unmarked);
 
 	int64_t *ptr = unmarked->index;
 	int64_t *endptr = unmarked->index + unmarked->n;
