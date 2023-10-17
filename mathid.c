@@ -982,6 +982,27 @@ free_unmarked(struct math_context *M) {
 	M->unmarked.n = 0;
 }
 
+static inline int
+check_freelist(struct math_context *M) {
+	struct marked_freelist *list = M->freelist;
+	while (list) {
+		int pageid = list->page;
+		if (pageid < 0 || pageid >= M->marked_page) {
+			return 0;
+		}
+		struct page * p = M->p[pageid].marked;
+		if (p == NULL)
+			return 0;
+		uintptr_t begin = (uintptr_t)p;
+		uintptr_t end = (uintptr_t)(p+1);
+		uintptr_t address = (uintptr_t)list;
+		if (address < begin || address >= end)
+			return 0;
+		list = list->next;
+	}
+	return 1;
+}
+
 void
 math_frame(struct math_context *M) {
 	union {
@@ -1004,6 +1025,7 @@ math_frame(struct math_context *M) {
 	free_unmarked(M);
 	M->top = M->base;
 	M->base = M->n;
+//	assert(check_freelist(M));
 }
 
 int
