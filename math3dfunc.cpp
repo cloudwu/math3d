@@ -689,7 +689,7 @@ math_t
 math3d_perspectiveLH(struct math_context *M, float fov, float aspect, float near, float far, int inv_z, int inf_f, int homogeneous_depth) {
   math_t id;
   if(inv_z){
-	std::swap(near, far);
+	float temp = near; near = far; far = temp;
   }
   glm::mat4x4 &mat = allocmat(M, &id);
   if(inf_f){
@@ -708,7 +708,7 @@ math_t
 math3d_frustumLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z, int inf_f, int homogeneous_depth) {
   math_t id;
   if(inv_z){
-	std::swap(near, far);
+	float temp = near; near = far; far = temp;
   }
   glm::mat4x4 &mat = allocmat(M, &id);
   if(inf_f){
@@ -727,7 +727,7 @@ math_t
 math3d_orthoLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z, int homogeneous_depth) {
 	math_t id;
 	if(inv_z){
-		std::swap(near, far);
+		float temp = near; near = far; far = temp;
 	}
 	glm::mat4x4 &mat = allocmat(M, &id);
 	mat = homogeneous_depth ?
