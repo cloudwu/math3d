@@ -1997,7 +1997,7 @@ laabb_test_point(lua_State *L) {
 	math_t aabb = aabb_from_index(L, M, 1);
 	math_t v = vector_from_index(L, M, 2);
 
-	lua_pushboolean(L, math3d_aabb_test_point(M, aabb, v));
+	lua_pushnumber(L, math3d_aabb_test_point(M, aabb, v));
 	return 1;
 }
 
