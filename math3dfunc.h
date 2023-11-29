@@ -41,7 +41,7 @@ math_t math3d_perspectiveLH(struct math_context *M, float fov, float aspect, flo
 math_t math3d_frustumLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z, int inf_f, int homogeneous_depth);
 math_t math3d_orthoLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z, int homogeneous_depth);
 math_t math3d_base_axes(struct math_context *M, math_t forward);	// return { right , up }
-math_t math3d_quat_to_viewdir(struct math_context *, math_t quat);
+math_t math3d_quat_to_viewdir(struct math_context *, math_t quat, math_t v);
 math_t math3d_rotmat_to_viewdir(struct math_context *, math_t mat);
 math_t math3d_viewdir_to_quat(struct math_context *, math_t v);
 void math3d_minmax(struct math_context *, math_t transform, math_t v, math_t minmax[2]);

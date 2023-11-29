@@ -1305,7 +1305,16 @@ ltodirection(lua_State *L) {
 	math_t r;
 	switch (type) {
 	case MATH_TYPE_QUAT:
-		r = math3d_quat_to_viewdir(M, v);
+		const int n = lua_gettop(L);
+		math_t v2;
+		if(n == 1){
+			float tmp[4] = {0, 0, 1, 0};
+			v2 = math_vec4(M, tmp);
+		}
+		else if(n == 2){
+			v2 = get_id(L, M, 2);
+		}
+		r = math3d_quat_to_viewdir(M, v, v2);
 		break;
 	case MATH_TYPE_MAT:
 		r = math3d_rotmat_to_viewdir(M, v);

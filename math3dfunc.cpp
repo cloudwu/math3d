@@ -765,10 +765,11 @@ math3d_base_axes(struct math_context *M, math_t forward_id) {
 }
 
 math_t
-math3d_quat_to_viewdir(struct math_context *M, math_t quat) {
+math3d_quat_to_viewdir(struct math_context *M, math_t quat, math_t v) {
 	math_t id;
 	glm::vec4 &d = allocvec4(M, &id);
-	d = glm::rotate(QUAT(M, quat), glm::vec4(0, 0, 1, 0));
+	const glm::vec4 &vv = VEC(M, v);
+	d = glm::rotate(QUAT(M, quat), vv);
 	return id;
 }
 
