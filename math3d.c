@@ -162,6 +162,7 @@ lmark(lua_State *L) {
 static inline void
 unmark_check(struct math_context *M, math_t id) {
 	int r = math_unmark(M, id);
+	(void)r;
 	assert(r>=0);
 }
 
