@@ -798,7 +798,7 @@ array_from_index(lua_State *L, struct math_context *M, int index, int type) {
 		default:
 			luaL_error(L, "Unsupported array type %s", math_typename(type));
 		}
-		return math_import(M, v, type, sz);
+		return math_import(M, v, type, (int)sz);
 	}
 	luaL_checktype(L, index, LUA_TTABLE);
 	int n = (int)lua_rawlen(L, index);
@@ -2175,6 +2175,27 @@ lpoint2plane(lua_State *L) {
 	return 1;
 }
 
+static int
+ltriangle_ray(lua_State *L){
+	struct math_context *M = GETMC(L);
+	const math_t o = vector_from_index(L, M, 1);
+	const math_t d = vector_from_index(L, M, 2);
+
+	const math_t v0 = vector_from_index(L, M, 3);
+	const math_t v1 = vector_from_index(L, M, 4);
+	const math_t v2 = vector_from_index(L, M, 5);
+
+	struct ray_triangle_interset_result r;
+	if (math3d_ray_triangle_interset(M, o, d, v0, v1, v2, &r)){
+		lua_pushboolean(L, 1);
+		lua_pushnumber(L, r.t);
+		return 2;
+	}
+
+	lua_pushboolean(L, 0);
+	return 1;
+}
+
 static math_t
 get_vec_or_number(lua_State *L, struct math_context *M, int index) {
 	if (lua_type(L, index) == LUA_TNUMBER) {
@@ -2471,7 +2492,7 @@ static int
 linfo(lua_State *L) {
 	struct math_context * M = GETMC(L);
 	if (lua_type(L, 1) == LUA_TNUMBER) {
-		lua_pushinteger(L, math_info(M, lua_tointeger(L, 1)));
+		lua_pushinteger(L, math_info(M, (int)lua_tointeger(L, 1)));
 		return 1;
 	}
 	const char *what = luaL_checkstring(L, 1);
@@ -2509,7 +2530,7 @@ lcheckpoint(lua_State *L) {
 static int
 lrecover(lua_State *L) {
 	struct math_context * M = GETMC(L);
-	int cp = luaL_checkinteger(L, 1);
+	int cp = (int)luaL_checkinteger(L, 1);
 	math_recover(M, cp);
 	return 0;
 }
@@ -2542,7 +2563,7 @@ lmarked_list(lua_State *L) {
 			lua_pushinteger(L, 1);
 			// table source 1
 		} else {
-			int n = lua_tointeger(L, -1);
+			int n = (int)lua_tointeger(L, -1);
 			lua_pop(L, 1);
 			lua_pushinteger(L, n + 1);
 		}
@@ -2658,6 +2679,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 
 		//primitive
 		{ "point2plane",	lpoint2plane},
+		{ "triangle_ray",	ltriangle_ray},
 
 		{ "marked_vector", lmarked_vector },
 		{ "marked_matrix", lmarked_matrix },
@@ -2754,7 +2776,7 @@ math3d_object(lua_State *L, int maxpage) {
 
 static int
 lnew_math3d(lua_State *L) {
-	int maxpage = luaL_optinteger(L, 1, 0);
+	int maxpage = (int)luaL_optinteger(L, 1, 0);
 	math3d_object(L, maxpage);
 	return 1;
 }

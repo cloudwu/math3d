@@ -129,6 +129,55 @@ do
 	print(math3d.tostring(intersetion_pt))
 end
 
+print "----- ray/line interset with triangles -----"
+do
+	local v0, v1, v2 = math3d.vector(-1.0, 0.0, 0.0, 1.0), math3d.vector(0.0, 1.0, 0.0, 1.0), math3d.vector(1.0, 0.0, 0.0, 1.0)
+	print "\ttriangle1:"
+	print("\tv0:", math3d.tostring(v0))
+	print("\tv1:", math3d.tostring(v1))
+	print("\tv2:", math3d.tostring(v2))
+
+	local v3, v4, v5 = math3d.vector(-1.0, 0.0, 2.0, 1.0), math3d.vector(0.0, 1.0, 2.0, 1.0), math3d.vector(1.0, 0.0, 2.0, 1.0)
+	print "\ttriangle2:"
+	print("\tv3:", math3d.tostring(v3))
+	print("\tv4:", math3d.tostring(v4))
+	print("\tv5:", math3d.tostring(v5))
+
+	local v6, v7, v8 = math3d.vector(0.0, 0.0, 1.0, 1.0), math3d.vector(0.0, 1.0, 0.0, 1.0), math3d.vector(0.0, 0.0, -1.0, 1.0)
+	print "\ttriangle3:"
+	print("\tv6:", math3d.tostring(v6))
+	print("\tv7:", math3d.tostring(v7))
+	print("\tv8:", math3d.tostring(v8))
+
+	local ray = {o=math3d.vector(0.0, 0.0, 0.0), d=math3d.vector(0.0, 0.0, 1.0)}
+	print "\tinterset with ray:"
+	print("\tray.origin:", math3d.tostring(ray.o))
+	print("\tray.direction:", math3d.tostring(ray.d))
+
+	print "\tsegment1 interset with triangle:"
+	local s0, s1 = math3d.vector(0, 0, 1, 1), math3d.vector(0, 0, 3, 1)
+	
+	print("\tstart point:", math3d.tostring(s0))
+	print("\tend point:", math3d.tostring(s1))
+
+	local interset, t = math3d.triangle_ray(ray.o, ray.d, v0, v1, v2)
+	if interset then
+		print("\tray triangle interset result:%f, point:%s", t, math3d.tostring(math3d.muladd(ray.d, t, ray.o)))
+	else
+		print "\tray NOT interset with triangle"
+	end
+
+	print"\tsegment with triangle1:"
+	interset, t = math3d.triangle_ray(s0, math3d.sub(s1, s0), v0, v1, v2)
+	print("\tsegment interset with triangle1: ", interset, "t: ", t, "is in the segment:", 0<=t and t<=1.0)
+
+	interset, t = math3d.triangle_ray(s0, math3d.sub(s1, s0), v3, v4, v5)
+	print("\tsegment interset with triangle2: ", interset, "t: ", t, "is in the segment:", 0<=t and t<=1.0)
+
+	interset, t = math3d.triangle_ray(s0, math3d.sub(s1, s0), v6, v7, v8)
+	print("\tsegment interset with triangle3: ", interset, "t: ", t)
+end
+
 print "===SRT==="
 do
 	ref1.m = { r = { 0, math.rad(60), 0 }, t = { 1,2,3} }	-- .s = 1

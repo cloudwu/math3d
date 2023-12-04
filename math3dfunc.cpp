@@ -1372,3 +1372,65 @@ float
 math3d_point2plane(struct math_context *M, math_t pt, math_t plane) {
 	return glm::dot(VEC3(M, pt), VEC3(M, plane)) + VEC(M, plane)[3];
 }
+
+// from: https://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/raytri/
+static inline
+bool intersect_triangle3(const glm::vec3& orig, const glm::vec3& dir,
+			const glm::vec3 &v0, const glm::vec3 &v1, const glm::vec3 &v2, 
+			ray_triangle_interset_result &r)
+{
+	constexpr float EPSILON = 1e-6f;
+
+	/* find vectors for two edges sharing vert0 */
+	const auto edge1 = v1 - v0;
+	const auto edge2 = v2 - v0;
+
+	/* begin calculating determinant - also used to calculate U parameter */
+	const auto pvec = glm::cross(dir, edge2);
+
+	/* if determinant is near zero, ray lies in plane of triangle */
+	const float det = glm::dot(edge1, pvec);
+	const float inv_det = 1.f / det;
+
+	/* calculate distance from vert0 to ray origin */
+	const auto tvec = orig - v0;
+	
+	const auto qvec = glm::cross(tvec, edge1);
+
+	if (det > EPSILON)
+	{
+		r.u = glm::dot(tvec, pvec);
+		if (r.u < 0.f || r.u > det)
+			return false;
+
+		/* calculate V parameter and test bounds */
+		r.v = glm::dot(dir, qvec);
+		if (r.v < 0.0 || (r.u+r.v) > det)
+			return false;
+	}
+	else if (det < -EPSILON)
+	{
+		/* calculate U parameter and test bounds */
+		r.u = glm::dot(tvec, pvec);
+		if (r.u > 0.0 || r.u < det)
+			return false;
+
+		/* calculate V parameter and test bounds */
+		r.v = glm::dot(dir, qvec);
+		if (r.v > 0.0 || (r.u+r.v) < det)
+			return false;
+	}
+	else
+		return false; /* ray is parallell to the plane of the triangle */
+
+	r.t = glm::dot(edge2, qvec) * inv_det;
+	r.u *= inv_det;
+	r.v *= inv_det;
+
+	return true;
+}
+
+int
+math3d_ray_triangle_interset(struct math_context *M, math_t o, math_t d, math_t v0, math_t v1, math_t v2, struct ray_triangle_interset_result *r){
+	return intersect_triangle3(VEC3(M, o), VEC3(M, d), VEC3(M, v0), VEC3(M, v1), VEC3(M, v2), *r);
+}
