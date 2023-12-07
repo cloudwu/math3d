@@ -17,14 +17,8 @@ math3d_interface(lua_State *L) {
 	return (struct math3d_api *)lua_touserdata(L, lua_upvalueindex(1));
 }
 
-static inline void *
-get_pointer(lua_State *L, struct math3d_api *api, int index, int type) {
-	math_t id = math3d_from_lua(L, api, index, type);
-	return (void *)math_value(api->M, id);
-}
-
 static void *
-getopt_pointer(lua_State *L, struct math3d_api *api, int index, int type) {
+get_pointer(lua_State *L, struct math3d_api *api, int index, int type) {
 	if (lua_isnoneornil(L, index)) {
 		return NULL;
 	} else {
@@ -41,6 +35,15 @@ get_pointer_variant(lua_State *L, struct math3d_api *api, int index, int elemtyp
 	}
 }
 
+static void
+push_pointer(lua_State *L, void *v) {
+	if (v) {
+		lua_pushlightuserdata(L, v);
+	} else {
+		lua_pushnil(L);
+	}
+}
+
 // upvalue1  mathstack
 // upvalue2  cfunction
 // upvalue3  from
@@ -51,7 +54,7 @@ lmatrix_adapter_1(lua_State *L) {
 	int from = (int)lua_tointeger(L, lua_upvalueindex(3));
 	void * v = get_pointer(L, api, from, MATH_TYPE_MAT);
 	lua_settop(L, from-1);
-	lua_pushlightuserdata(L, v);
+	push_pointer(L, v);
 	return f(L);
 }
 
@@ -60,19 +63,11 @@ lmatrix_adapter_2(lua_State *L) {
 	struct math3d_api *api = math3d_interface(L);
 	lua_CFunction f = lua_tocfunction(L, lua_upvalueindex(2));
 	int from = (int)lua_tointeger(L, lua_upvalueindex(3));
-	void * v1 = getopt_pointer(L, api, from, MATH_TYPE_MAT);
-	void * v2 = getopt_pointer(L, api, from+1, MATH_TYPE_MAT);
+	void * v1 = get_pointer(L, api, from, MATH_TYPE_MAT);
+	void * v2 = get_pointer(L, api, from+1, MATH_TYPE_MAT);
 	lua_settop(L, from-1);
-	if (v1) {
-		lua_pushlightuserdata(L, v1);
-	} else {
-		lua_pushnil(L);
-	}
-	if (v2) {
-		lua_pushlightuserdata(L, v2);
-	} else {
-		lua_pushnil(L);
-	}
+	push_pointer(L, v1);
+	push_pointer(L, v2);
 	return f(L);
 }
 
@@ -84,11 +79,9 @@ lmatrix_adapter_var(lua_State *L) {
 	int i;
 	int top = lua_gettop(L);
 	for (i=from;i<=top;i++) {
-		void * v = getopt_pointer(L, api, i, MATH_TYPE_MAT);
-		if (v) {
-			lua_pushlightuserdata(L, v);
-			lua_replace(L, i);
-		}
+		void * v = get_pointer(L, api, i, MATH_TYPE_MAT);
+		push_pointer(L, v);
+		lua_replace(L, i);
 	}
 	return f(L);
 }
@@ -140,7 +133,7 @@ lvector(lua_State *L) {
 	for (ii = from; ii <= top; ++ii) {
 		if (!lua_isnil(L, ii)) {
 			void* p = get_pointer(L, api, ii, MATH_TYPE_VEC4);
-			lua_pushlightuserdata(L, p);
+			push_pointer(L, p);
 			lua_replace(L, ii);
 		}
 	}
@@ -179,10 +172,8 @@ convert_stack_value(lua_State *L, struct math3d_api *api, int from, int top, int
 	int i;
 	for (i = from; i <= top; i++) {
 		void * v = get_pointer_variant(L, api, i, elemtype);
-		if (v) {
-			lua_pushlightuserdata(L, v);
-			lua_replace(L, i);
-		}
+		push_pointer(L, v);
+		lua_replace(L, i);
 	}
 }
 
@@ -252,7 +243,7 @@ lformat(lua_State *L, const char *format) {
 			luaL_error(L, "Invalid format string %s", format);
 			break;
 		}
-		lua_pushlightuserdata(L, v);
+		push_pointer(L, v);
 		lua_replace(L, index);
 	}
 	return f(L);
