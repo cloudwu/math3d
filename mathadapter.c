@@ -22,7 +22,8 @@ get_pointer(lua_State *L, struct math3d_api *api, int index, int type) {
 	if (lua_isnoneornil(L, index)) {
 		return NULL;
 	} else {
-		return get_pointer(L, api, index, type);
+		math_t id = math3d_from_lua(L, api, index, type);
+		return (void *)math_value(api->M, id);
 	}
 }
 
