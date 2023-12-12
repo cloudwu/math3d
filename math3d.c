@@ -2441,7 +2441,7 @@ lconstant(lua_State *L) {
 	} else {
 		return luaL_error(L, "Unknown type %s", tname);
 	}
-	if (lua_isnil(L, -1) || lua_rawlen(L, -1) == 0) {
+	if (lua_isnil(L, -1)) {
 		lua_pushlightuserdata(L, MATH_TO_HANDLE(math_identity(type)));
 		return 1;
 	}
