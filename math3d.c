@@ -2451,16 +2451,16 @@ lconstant(lua_State *L) {
 
 	switch (type) {
 	case MATH_TYPE_MAT:
-		id = matrix_from_table(L, M, -1);
+		id = matrix_from_index(L, M, -1);
 		break;
 	case MATH_TYPE_VEC4:
-		id = vector_from_table(L, M, -1);
+		id = vector_from_index(L, M, -1);
 		break;
 	case MATH_TYPE_QUAT:
-		id = quat_from_table(L, M, -1);
+		id = quat_from_index(L, M, -1);
 		break;
 	case MATH_TYPE_AABB:
-		id = aabb_from_table(L, M, -1);
+		id = aabb_from_index(L, M, -1);
 		break;
 	}
 	id = math_constant(M, id);
