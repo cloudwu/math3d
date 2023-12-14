@@ -20,16 +20,14 @@ do
 	local c3 = math3d.matrix { s = 1 , t = { 0,0,0 } }
 	assert(c == c3)
 
-	local iv = math3d.constant { type = "v4" }
-	print(iv, math3d.tostring(iv))
-	local qv = math3d.constant { type = "quat" }
-	print(qv, math3d.tostring(qv))
-	local mv = math3d.constant { type = "mat" }
-	print(mv, math3d.tostring(mv))
+	assert(math3d.constant("v4", {0,0,0,1}) == math3d.constant "v4")
+	assert(math3d.constant("v4", math3d.vector(0,0,0,1)) == math3d.constant "v4")
 
-	assert(math3d.constant("v4", 0,0,0,1) == math3d.constant "v4")
-	assert(math3d.constant("quat", 0,0,0,1) == math3d.constant "quat")
-	assert(math3d.constant("mat", 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1) == math3d.constant "mat")
+	assert(math3d.constant("quat", {0,0,0,1}) == math3d.constant "quat")
+	assert(math3d.constant("quat", math3d.quaternion(0,0,0,1)) == math3d.constant "quat")
+
+	assert(math3d.constant("mat", {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}) == math3d.constant "mat")
+	assert(math3d.constant("mat", math3d.matrix(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)) == math3d.constant "mat")
 
 	local vec = math3d.constant { type = "v4", 1,2,3,4 }
 	print(vec, math3d.tostring(vec))
@@ -318,34 +316,6 @@ do
 	print("PROJ", math3d.tostring(projmat))
 end
 
-print "===ADAPTER==="
-local adapter = require "math3d.adapter" (math3d._COBJECT)
-local testfunc = require "math3d.adapter.test"
-
-local vector = adapter.vector(testfunc.vector, 1)	-- convert arguments to vector pointer from 1
-local matrix1 = adapter.matrix(testfunc.matrix1, 1, 1)	-- convert 1 mat
-local matrix2 = adapter.matrix(testfunc.matrix2, 1, 2)	-- convert 2 mat
-local matrix = adapter.matrix(testfunc.matrix2, 1)	-- convert all mat
-local var = adapter.variant(testfunc.vector, testfunc.matrix1, 1)
-local format = adapter.format(testfunc.variant, testfunc.format, 2)
-local mvq = adapter.getter(testfunc.getmvq, "mvq")	-- getmvq will return matrix, vector, quat
-local matrix2_v = adapter.format(testfunc.matrix2, "mm", 1)
-local retvec = adapter.output_vector(testfunc.retvec, 1)
-print(vector(ref2, math3d.vector{1,2,3}))
-print(matrix1(ref1))
-print(matrix2(ref1,ref1))
-print(matrix2_v(ref1,ref1))
-print(matrix(ref1,ref1))
-print(var(ref1))
-print(var(ref2))
-print(format("mv", ref1, ref2))
-local m,v, q = mvq()
-print(math3d.tostring(m), math3d.tostring(v), math3d.tostring(q))
-
-local v1,v2 =retvec()
-print(math3d.tostring(v1), math3d.tostring(v2))
-
-
 print "===AABB&FRUSTUM==="
 do
 	local aabb = math3d.ref(math3d.aabb(math3d.vector(-1, 2, 3), math3d.vector(1, 2, -3), math3d.vector(-2, 3, 6)))
@@ -358,6 +328,10 @@ do
 	local vp = math3d.mul(math3d.projmat{aspect=60, fov=1024/768, n=0.1, f=100}, math3d.lookto(math3d.vector(0, 0, -10), math3d.vector(0, 0, 1)))
 	local frustum_planes = math3d.frustum_planes(vp)
 	local frustum_points = math3d.frustum_points(vp)
+	print("full frustum:", math3d.tostring(frustum_points))
+
+	local sub_frustum_points = math3d.frustum_points(vp, 0.01, 0.05)
+	print("sub frustum[0.01, 0.05]:", math3d.tostring(sub_frustum_points))
 
 	local intersectresult = math3d.frustum_intersect_aabb(frustum_planes, aabb)
 
@@ -591,44 +565,75 @@ do
 	print(math3d.tostring(v))
 end
 
--- PROJECTIVE MATRIX WITH INFINITE FAR PLANE TEST
+print "===ADAPTER==="
+local adapter = require "math3d.adapter" (math3d._COBJECT)
+local testfunc = pcall(require, "math3d.adapter.test")
 
-local function compare_camera(inv_z, n, f, ortho)
-	local p, infp
-	if ortho then
-		p = math3d.projmat({l=-1,r=1,t=-1,b=1,n=n,f=f,ortho=true}, inv_z)
-		infp = math3d.projmat({l=-1,r=1,t=-1,b=1,n=n,f=f,ortho=true}, true)
-	else
-		p = math3d.projmat({n=n, f=f, fov=60, aspect=4/3}, inv_z)
-		infp = math3d.projmat({n=n, f=f, fov=60, aspect=4/3}, inv_z, true)
-	end
-    local updir = math3d.vector(0, 1, 0)
-    local eyepos = math3d.vector(0, 0, 0)
-    local direction = math3d.normalize(math3d.vector(0, 0, 1))
-    local v = math3d.lookto(eyepos, direction, updir)
-    local vp = math3d.mul(p, v)
-    local vinfp = math3d.mul(infp, v)
+if testfunc then
+	local vector 	= adapter.vector(testfunc.vector, 1)	-- convert arguments to vector pointer from 1
+	local matrix1 	= adapter.matrix(testfunc.matrix1, 1, 1)	-- convert 1 mat
+	local matrix2 	= adapter.matrix(testfunc.matrix2, 1, 2)	-- convert 2 mat
+	local matrix 	= adapter.matrix(testfunc.matrix2, 1)	-- convert all mat
+	local var 		= adapter.variant(testfunc.vector, testfunc.matrix1, 1)
+	local format 	= adapter.format(testfunc.variant, testfunc.format, 2)
+	local mvq 		= adapter.getter(testfunc.getmvq, "mvq")	-- getmvq will return matrix, vector, quat
+	local matrix2_v = adapter.format(testfunc.matrix2, "mm", 1)
+	local retvec 	= adapter.output_vector(testfunc.retvec, 1)
 
-    local zz_n, ww_n = math3d.index(math3d.transform(vp, math3d.vector(0, 0, n), 1), 3, 4)
-    local zzinf_n, wwinf_n = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, n), 1), 3, 4)
+	print(vector(ref2, math3d.vector{1,2,3}))
+	print(matrix1(ref1))
+	print(matrix2(ref1,ref1))
+	print(matrix2_v(ref1,ref1))
+	print(matrix(ref1,ref1))
+	print(var(ref1))
+	print(var(ref2))
+	print(format("mv", ref1, ref2))
+	local m,v, q = mvq()
+	print(math3d.tostring(m), math3d.tostring(v), math3d.tostring(q))
 
-    local zz_m, ww_m = math3d.index(math3d.transform(vp, math3d.vector(0, 0, (n+f)*0.5), 1), 3, 4)
-    local zzinf_m, wwinf_m = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, (n+f)*0.5), 1), 3, 4)
-
-    local zz_f, ww_f = math3d.index(math3d.transform(vp, math3d.vector(0, 0, f), 1), 3, 4)
-    local zzinf_f, wwinf_f = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, f), 1), 3, 4)
-    
-    local ndf_n, ndf_n_inf = zz_n / ww_n, zzinf_n / wwinf_n
-    local ndf_m, ndf_m_inf = zz_m / ww_m, zzinf_m / wwinf_m
-    local ndf_f, ndf_f_inf = zz_f / ww_f, zzinf_f / wwinf_f    
-    return ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf
+	local v1,v2 =retvec()
+	print(math3d.tostring(v1), math3d.tostring(v2))
 end
 
-local ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.1, 10000)
-ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf= compare_camera(true, 0.1, 20000)
-ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.01, 1000)
-ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(true, 0.01, 2000)
-ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.1, 10000, true)
-ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf= compare_camera(true, 0.1, 20000, true)
-ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.01, 1000, true)
-ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(true, 0.01, 2000, true)
+print "===PROJECTIVE MATRIX WITH INFINITE FAR PLANE TEST==="
+do
+	local function compare_camera(inv_z, n, f, ortho)
+		local p, infp
+		if ortho then
+			p = math3d.projmat({l=-1,r=1,t=-1,b=1,n=n,f=f,ortho=true}, inv_z)
+			infp = math3d.projmat({l=-1,r=1,t=-1,b=1,n=n,f=f,ortho=true}, true)
+		else
+			p = math3d.projmat({n=n, f=f, fov=60, aspect=4/3}, inv_z)
+			infp = math3d.projmat({n=n, f=f, fov=60, aspect=4/3}, inv_z, true)
+		end
+		local updir = math3d.vector(0, 1, 0)
+		local eyepos = math3d.vector(0, 0, 0)
+		local direction = math3d.normalize(math3d.vector(0, 0, 1))
+		local v = math3d.lookto(eyepos, direction, updir)
+		local vp = math3d.mul(p, v)
+		local vinfp = math3d.mul(infp, v)
+	
+		local zz_n, ww_n = math3d.index(math3d.transform(vp, math3d.vector(0, 0, n), 1), 3, 4)
+		local zzinf_n, wwinf_n = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, n), 1), 3, 4)
+	
+		local zz_m, ww_m = math3d.index(math3d.transform(vp, math3d.vector(0, 0, (n+f)*0.5), 1), 3, 4)
+		local zzinf_m, wwinf_m = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, (n+f)*0.5), 1), 3, 4)
+	
+		local zz_f, ww_f = math3d.index(math3d.transform(vp, math3d.vector(0, 0, f), 1), 3, 4)
+		local zzinf_f, wwinf_f = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, f), 1), 3, 4)
+		
+		local ndf_n, ndf_n_inf = zz_n / ww_n, zzinf_n / wwinf_n
+		local ndf_m, ndf_m_inf = zz_m / ww_m, zzinf_m / wwinf_m
+		local ndf_f, ndf_f_inf = zz_f / ww_f, zzinf_f / wwinf_f    
+		return ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf
+	end
+	
+	local ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.1, 10000)
+	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf= compare_camera(true, 0.1, 20000)
+	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.01, 1000)
+	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(true, 0.01, 2000)
+	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.1, 10000, true)
+	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf= compare_camera(true, 0.1, 20000, true)
+	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.01, 1000, true)
+	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(true, 0.01, 2000, true)
+end

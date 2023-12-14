@@ -2148,7 +2148,17 @@ static int
 lfrustum_points(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	math_t m = matrix_from_index(L, M, 1);
-	math_t result = math3d_frustum_points(M, m, math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH));
+	const int HOMOGENEOUS_DEPTH = math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH);
+	math_t result;
+	if (lua_isnoneornil(L, 2) && lua_isnoneornil(L, 3)){
+		result = math3d_frustum_points(M, m, HOMOGENEOUS_DEPTH);
+	} else {
+		const float n = (float)luaL_checknumber(L, 2);
+		const float f = (float)luaL_checknumber(L, 3);
+
+		result = math3d_frustum_points_with_nearfar(M, m, n, f);
+	}
+
 	lua_pushmath(L, result);
 	return 1;
 }
