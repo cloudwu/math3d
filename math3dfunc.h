@@ -65,6 +65,7 @@ math_t math3d_aabb_expand(struct math_context *, math_t aabb, math_t e);
 math_t math3d_frustum_planes(struct math_context *, math_t m, int homogeneous_depth);	// return vec4[6]
 int math3d_frustum_intersect_aabb(struct math_context *, math_t planes, math_t aabb);
 math_t math3d_frustum_points(struct math_context *, math_t m, int homogeneous_depth);	// return vec4[8]
+math_t math3d_frustum_points_with_nearfar(struct math_context *M, math_t m, float n, float f);
 void math3d_frustum_calc_near_far(struct math_context *, math_t planes, float result[2]); // return { near, far }
 float math3d_point2plane(struct math_context *, math_t pt, math_t plane);
 
