@@ -595,17 +595,26 @@ math3d_inverse_matrix(struct math_context *M, math_t mat) {
 math_t
 math3d_inverse_matrix_fast(struct math_context *M, math_t mat) {
 	math_t id;
+	const auto &m = MAT(M, mat);
+	
 	glm::mat4x4 &r = allocmat(M, &id);
-	auto &m = MAT(M, mat);
-	glm::mat3x3 m3(m);
+	r = m;
 
-	auto d01 = glm::dot(m3[0], m3[1]);
-	auto d12 = glm::dot(m3[1], m3[2]);
-	auto d20 = glm::dot(m3[2], m3[0]);
-	//assert(is_zero() && is_zero(glm::dot(m3[1], m3[2])) && is_zero(glm::dot(m3[2], m3[0])));
-	assert(is_zero(d01, 10e-6f) && is_zero(d12, 10e-6f) && is_zero(d20, 10e-6f));
-	glm::transpose(m3);
-	r = glm::mat4(m3) * glm::translate(glm::mat4(1.f), glm::vec3(-m[3]));
+	#define V3(V4) (*(const glm::vec3*)(&(V4)))
+	assert(	is_zero(glm::dot(V3(m[0]), V3(m[1])), 1e-6f) &&
+			is_zero(glm::dot(V3(m[1]), V3(m[2])), 1e-6f) &&
+			is_zero(glm::dot(V3(m[2]), V3(m[0])), 1e-6f));
+
+	// DOT not write: auto m3 = (glm::mat3*)(&m);
+	// transpose 3x3
+	std::swap(r[0][1], r[1][0]);
+	std::swap(r[0][2], r[2][0]);
+	std::swap(r[1][2], r[2][1]);
+
+	glm::vec3& c3 = *(glm::vec3*)(&r[3]);
+
+	// rotate t -> T = r * t ==> glm::vec3(dot(row0(r), t), dot(row1(r), t), dot(row2(r), t), here row0(r) = col0(m)
+	c3 = -glm::vec3(glm::dot(V3(m[0]), c3), glm::dot(V3(m[1]), c3), glm::dot(V3(m[2]), c3));
 	return id;
 }
 
@@ -1330,16 +1339,16 @@ static const glm::vec4 ndc_points_ZO[8] = {
 	glm::vec4( 1.f, 1.f, 0.f, 1.f),
 
 	glm::vec4(-1.f,-1.f, 1.f, 1.f),
-	glm::vec4(-1.f,1.f,  1.f, 1.f),
-	glm::vec4(1.f, -1.f, 1.f, 1.f),
-	glm::vec4(1.f, 1.f,  1.f, 1.f),
+	glm::vec4(-1.f, 1.f, 1.f, 1.f),
+	glm::vec4( 1.f,-1.f, 1.f, 1.f),
+	glm::vec4( 1.f, 1.f, 1.f, 1.f),
 };
 
 static const glm::vec4 ndc_points_NO[8] = {
-	glm::vec4(-1.f,-1.f, -1.f, 1.f),
-	glm::vec4(-1.f, 1.f, -1.f, 1.f),
-	glm::vec4( 1.f, -1.f,-1.f, 1.f),
-	glm::vec4( 1.f,  1.f,-1.f, 1.f),
+	glm::vec4(-1.f,-1.f,-1.f, 1.f),
+	glm::vec4(-1.f, 1.f,-1.f, 1.f),
+	glm::vec4( 1.f,-1.f,-1.f, 1.f),
+	glm::vec4( 1.f, 1.f,-1.f, 1.f),
 
 	glm::vec4(-1.f,-1.f, 1.f, 1.f),
 	glm::vec4(-1.f, 1.f, 1.f, 1.f),
