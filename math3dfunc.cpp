@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cassert>
 #include <cstring>
+#include <utility>
 
 extern "C" {
 	#include "mathid.h"
