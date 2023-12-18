@@ -2364,14 +2364,14 @@ lplane_ray(lua_State *L) {
 	//t = (d - o dot n) / (d1 dot n)
 	float dot_do = math3d_dot(M, ray_d, plane);
 
-	//ray direction is parrall to plane normal, not interset
+	//ray direction is perpendicular to plane normal, not interset
 	if (fabs(dot_do) < 1e-7){
-		lua_pushnumber(L, 0.f);
-	} else {
-		const float dis = math_value(M, plane)[3];
-		float t = (dis - math3d_dot(M, ray_o, plane)) / dot_do;
-		lua_pushnumber(L, t);
+		return 0;
 	}
+
+	const float dis = math_value(M, plane)[3];
+	float t = (dis - math3d_dot(M, ray_o, plane)) / dot_do;
+	lua_pushnumber(L, t);
 	return 1;
 }
 
