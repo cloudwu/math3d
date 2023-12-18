@@ -855,25 +855,34 @@ maxv(struct math_context *M, math_t v0, math_t v1) {
 	return math_vec4(M, tmp);
 }
 
-void
-math3d_minmax(struct math_context *M, math_t transform, math_t v, math_t minmax[2]) {
-	if (!math_isnull(transform)) {
-		const glm::vec4 &vv = VEC(M, v);
-		glm::vec4 &result = allocvec4(M, &v);
-		result = MAT(M, transform) * vv;
-	}
-	if (math_isnull(minmax[0])) {
-		minmax[0] = v;
+math_t
+math3d_minmax(struct math_context *M, math_t transform, math_t points) {
+	const size_t numpoints	= math_size(M, points);
+	if (numpoints == 0)
+		return MATH_NULL;
+
+	const math_t p = math_index(M, points, 0);
+	glm::vec4 minmax[2] = {
+		VEC(M, p),
+		VEC(M, p),
+	};
+
+	if (math_isnull(transform)){
+		for (int ii=1; ii<numpoints; ++ii){
+			const auto& pp = VEC(M, math_index(M, points, ii));
+			minmax[0] = glm::min(minmax[0], pp);
+			minmax[1] = glm::max(minmax[1], pp);
+		}
 	} else {
-		check_type(M, minmax[0], MATH_TYPE_VEC4);
-		minmax[0] = minv(M, minmax[0], v);
+		const glm::mat4& m = MAT(M, transform);
+		for (int ii=1; ii<numpoints; ++ii){
+			const glm::vec4 tpp = m * VEC(M, math_index(M, points, ii));
+			minmax[0] = glm::min(minmax[0], tpp);
+			minmax[1] = glm::max(minmax[1], tpp);
+		}
 	}
-	if (math_isnull(minmax[1])) {
-		minmax[1] = v;
-	} else {
-		check_type(M, minmax[1], MATH_TYPE_VEC4);
-		minmax[1] = maxv(M, minmax[1], v);
-	}
+
+	return math_import(M, (const float*)minmax, MATH_TYPE_VEC4, 2);
 }
 
 math_t
@@ -1197,24 +1206,25 @@ math3d_aabb_test_point(struct math_context *M, math_t aabb, math_t v) {
 	return 1;
 }
 
-void
-math3d_aabb_points(struct math_context *M, math_t aabb, math_t points[8]) {
+math_t
+math3d_aabb_points(struct math_context *M, math_t aabb) {
 	auto t = AABB(M, aabb);
 
-	int i;
-	for (i=0;i<8;i++) {
-		points[i] = math_vec4(M, NULL);
-	}
+	math_t r = math_import(M, NULL, MATH_TYPE_VEC4, 8);
 
-	glm::vec4 &p0 = initvec4(M, points[0]); p0 = t.minv;
-	glm::vec4 &p1 = initvec4(M, points[1]); p1 = glm::vec4(t.minv.x, t.maxv.y, t.minv.z, 0);
-	glm::vec4 &p2 = initvec4(M, points[2]); p2 = glm::vec4(t.maxv.x, t.minv.y, t.minv.z, 0);
-	glm::vec4 &p3 = initvec4(M, points[3]); p3 = glm::vec4(t.maxv.x, t.maxv.y, t.minv.z, 0);
+	auto v = math_value(M, r);
+
+	*(glm::vec4*)v 		= t.minv;
+	*((glm::vec4*)v+1)	= glm::vec4(t.minv.x, t.maxv.y, t.minv.z, 0);
+	*((glm::vec4*)v+2)	= glm::vec4(t.maxv.x, t.minv.y, t.minv.z, 0);
+	*((glm::vec4*)v+3)	= glm::vec4(t.maxv.x, t.maxv.y, t.minv.z, 0);
 	                                  
-	glm::vec4 &p4 = initvec4(M, points[4]); p4 = glm::vec4(t.minv.x, t.minv.y, t.maxv.z, 0);
-	glm::vec4 &p5 = initvec4(M, points[5]); p5 = glm::vec4(t.minv.x, t.maxv.y, t.maxv.z, 0);
-	glm::vec4 &p6 = initvec4(M, points[6]); p6 = glm::vec4(t.maxv.x, t.minv.y, t.maxv.z, 0);
-	glm::vec4 &p7 = initvec4(M, points[7]); p7 = t.maxv;
+	*((glm::vec4*)v+4) = glm::vec4(t.minv.x, t.minv.y, t.maxv.z, 0);
+	*((glm::vec4*)v+5) = glm::vec4(t.minv.x, t.maxv.y, t.maxv.z, 0);
+	*((glm::vec4*)v+6) = glm::vec4(t.maxv.x, t.minv.y, t.maxv.z, 0);
+	*((glm::vec4*)v+7) = t.maxv;
+
+	return r;
 }
 
 math_t

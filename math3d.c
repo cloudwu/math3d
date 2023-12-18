@@ -1483,23 +1483,13 @@ lprojmat(lua_State *L) {
 static int
 lminmax(lua_State *L) {
 	struct math_context *M = GETMC(L);
-
-	const math_t points = array_from_index(L, M, 1, MATH_TYPE_VEC4);
-
-	const math_t transform = object_from_index(L, M, 2, MATH_TYPE_MAT, matrix_from_table);	// can be null
-	math_t minmax[2] = { MATH_NULL, MATH_NULL };
-
-	const int numpoints = math_size(M, points);
-	int ii;
-	for (ii = 0; ii < numpoints; ++ii) {
-		math_t v = math_index(M, points, ii);
-		math3d_minmax(M, transform, v, minmax);
+	if (lua_gettop(L) > 2) {
+		luaL_error(L, "Use array_vector to pack append points");
 	}
-
-	lua_pushmath(L, minmax[0]);
-	lua_pushmath(L, minmax[1]);
-
-	return 2;
+	const math_t points 	= array_from_index(L, M, 1, MATH_TYPE_VEC4);
+	const math_t transform 	= object_from_index(L, M, 2, MATH_TYPE_MAT, matrix_from_table);	// can be null
+	lua_pushmath(L, math3d_minmax(M, transform, points));
+	return 1;
 }
 
 typedef float (*minmax_func)(float _X, float _Y);
@@ -1843,49 +1833,52 @@ alloc_aabb(lua_State *L, struct math_context *M, math_t *id) {
 }
 
 static math_t
-append_aabb(lua_State *L, struct math_context *M, math_t aabb, int from_index, int to_index) {
-	int i;
-	math_t minmax[2] = {
-		math_index(M, aabb, 0),
-		math_index(M, aabb, 1),
-	};
-	for (i=from_index;i<=to_index;i++) {
-		math_t v = vector_from_index(L, M, i);
-		math3d_minmax(M, MATH_NULL, v, minmax);
-	}
-	if (math_issame(minmax[0], math_index(M, aabb, 0)) &&
-		math_issame(minmax[1], math_index(M, aabb, 1))) {
-		return aabb;
-	} else {
-		math_t id;
-		float * r = alloc_aabb(L, M, &id);
-		memcpy(r, math_value(M, minmax[0]), 4 * sizeof(float));
-		memcpy(r+4, math_value(M, minmax[1]), 4 * sizeof(float));
-		return id;
-	}
-}
-
-static math_t
 laabb_(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	math_t id;
-	float *aabb = alloc_aabb(L, M, &id);
-	aabb[0] = FLT_MAX;
-	aabb[1] = FLT_MAX;
-	aabb[2] = FLT_MAX;
-	aabb[3] = 0;
+	const int top = lua_gettop(L);
+	if (top == 0){
+		math_t id;
+		float *aabb = alloc_aabb(L, M, &id);
+		aabb[0] = FLT_MAX;
+		aabb[1] = FLT_MAX;
+		aabb[2] = FLT_MAX;
+		aabb[3] = 0;
 
-	aabb[4+0] = -FLT_MAX;
-	aabb[4+1] = -FLT_MAX;
-	aabb[4+2] = -FLT_MAX;
-	aabb[4+3] = 0;
-
-	int top = lua_gettop(L);
-	if (top > 1) {
-		id = append_aabb(L, M, id, 1, top);
+		aabb[4+0] = -FLT_MAX;
+		aabb[4+1] = -FLT_MAX;
+		aabb[4+2] = -FLT_MAX;
+		aabb[4+3] = 0;
+		return id;
+	}
+	
+	if (top == 1){
+		return math3d_minmax(M, MATH_NULL, array_from_index(L, M, 1, MATH_TYPE_VEC4));
 	}
 
-	return id;
+	if (top == 2){
+		const float* m0 = math_value(M, vector_from_index(L, M, 1));
+		const float* m1 = math_value(M, vector_from_index(L, M, 2));
+
+		if (m0[0] > m1[0] || m0[1] > m1[1] || m0[2] > m1[2]){
+			luaL_error(L, "param from math3d.aabb should be 'min' and 'max' value");
+		}
+
+		math_t id;
+		float *aabb = alloc_aabb(L, M, &id);
+		aabb[0] = m0[0];
+		aabb[1] = m0[1];
+		aabb[2] = m0[2];
+		aabb[3] = 0;
+
+		aabb[4+0] = m1[0];
+		aabb[4+1] = m1[1];
+		aabb[4+2] = m1[2];
+		aabb[4+3] = 0;
+		return id;
+	}
+
+	luaL_error(L, "Use array_vector to pack math id");
+	return MATH_NULL;
 }
 
 static int
@@ -1910,8 +1903,12 @@ laabb_isvalid(lua_State *L) {
 static int
 laabb_append(lua_State *L){
 	struct math_context *M = GETMC(L);
+	const int n = lua_gettop(L);
+	if (n > 2){
+		luaL_error(L, "Use array_vector to pack append points");
+	}
 	math_t aabb = aabb_from_index(L, M, 1);
-	aabb = append_aabb(L, M, aabb, 2, lua_gettop(L));
+	math3d_aabb_merge(M, aabb, math3d_minmax(M, MATH_NULL, array_from_index(L, M, 2, MATH_TYPE_VEC4)));
 	lua_pushmath(L, aabb);
 	return 1;
 }
@@ -2035,14 +2032,7 @@ static int
 laabb_points(lua_State *L){
 	struct math_context *M = GETMC(L);
 	math_t aabb = aabb_from_index(L, M, 1);
-	math_t points[8];
-	math3d_aabb_points(M, aabb, points);
-	lua_createtable(L, 8, 0);
-	int i;
-	for (i=0;i<8;i++) {
-		lua_pushmath(L, points[i]);
-		lua_seti(L, -2, i+1);
-	}
+	lua_pushmath(L, math3d_aabb_points(M, aabb));
 	return 1;
 }
 
