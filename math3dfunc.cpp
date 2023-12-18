@@ -1061,7 +1061,7 @@ int
 math3d_aabb_isvalid(struct math_context *M, math_t aabb) {
 	auto t = AABB(M, aabb);
 
-	return (t.minv.x < t.maxv.x && t.minv.y < t.maxv.y && t.minv.z < t.maxv.z) ? 1 : 0;
+	return (t.minv.x <= t.maxv.x && t.minv.y <= t.maxv.y && t.minv.z <= t.maxv.z) ? 1 : 0;
 }
 
 math_t
