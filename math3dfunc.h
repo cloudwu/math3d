@@ -44,7 +44,7 @@ math_t math3d_base_axes(struct math_context *M, math_t forward);	// return { rig
 math_t math3d_quat_to_viewdir(struct math_context *, math_t quat);
 math_t math3d_rotmat_to_viewdir(struct math_context *, math_t mat);
 math_t math3d_viewdir_to_quat(struct math_context *, math_t v);
-void math3d_minmax(struct math_context *, math_t transform, math_t v, math_t minmax[2]);
+math_t math3d_minmax(struct math_context *, math_t transform, math_t v);
 math_t math3d_lerp(struct math_context *, math_t v0, math_t v1, float ratio);
 math_t math3d_quat_lerp(struct math_context *, math_t v0, math_t v1, float ratio);
 math_t math3d_quat_slerp(struct math_context *, math_t v0, math_t v1, float ratio);
@@ -60,7 +60,7 @@ math_t math3d_aabb_center_extents(struct math_context *, math_t aabb);	// return
 int math3d_aabb_intersect_plane(struct math_context *, math_t aabb, math_t plane);
 math_t math3d_aabb_intersection(struct math_context *, math_t aabb1, math_t aabb2);
 int math3d_aabb_test_point(struct math_context *, math_t aabb, math_t v);
-void math3d_aabb_points(struct math_context *, math_t aabb, math_t points[8]);
+math_t math3d_aabb_points(struct math_context *, math_t aabb);
 math_t math3d_aabb_expand(struct math_context *, math_t aabb, math_t e);
 math_t math3d_frustum_planes(struct math_context *, math_t m, int homogeneous_depth);	// return vec4[6]
 int math3d_frustum_intersect_aabb(struct math_context *, math_t planes, math_t aabb);

@@ -318,7 +318,7 @@ end
 
 print "===AABB&FRUSTUM==="
 do
-	local aabb = math3d.ref(math3d.aabb(math3d.vector(-1, 2, 3), math3d.vector(1, 2, -3), math3d.vector(-2, 3, 6)))
+	local aabb = math3d.minmax(math3d.array_vector(math3d.vector(-1, 2, 3), math3d.vector(1, 2, -3), math3d.vector(-2, 3, 6)))
 	assert(math3d.array_size(aabb) == 2)
 	print("aabb:min", math3d.tostring(math3d.array_index(aabb,1)), "aabb:max", math3d.tostring(math3d.array_index(aabb,2)))
 
@@ -370,16 +370,15 @@ do
 ]]
 	print "\t===AABB&minmax===="
 	local points = {
-		{1, 0, -1, -10},
-		{1, 2, -1, 1},
-		{1, 4, -5, 1},
-		{-2, 0, -1, 1},
+		math3d.vector(1, 0, -1, -10),
+		math3d.vector(1, 2, -1, 1),
+		math3d.vector(1, 4, -5, 1),
+		math3d.vector(-2, 0, -1, 1),
 	}
 
-	local min, max = math3d.minmax(points)
-	local aabb = math3d.aabb(min, max)
+	local aabb = math3d.minmax(points)
 	local aabb2 = math3d.aabb()
-	aabb2 = math3d.aabb_append(aabb2, table.unpack(points))
+	aabb2 = math3d.aabb_append(aabb2, points)
 
 	print("minmax-aabb:", math3d.tostring(aabb))
 	print("aabb-append:", math3d.tostring(aabb2))
@@ -388,8 +387,7 @@ do
 	local aabb = math3d.aabb()
 	assert(not math3d.aabb_isvalid(aabb))
 
-	local aabb2 = math3d.aabb(math3d.vector(0.0, 0.0, 0.0), math3d.vector(-1.0, 2.0, 3.0))
-	assert(math3d.aabb_isvalid(aabb2))
+	local aabb2 = math3d.aabb(math3d.vector(-1.0, 0.0, 0.0), math3d.vector(0.0, 2.0, 3.0))
 
 	local mergeaabb = math3d.aabb_merge(aabb, aabb2)
 	assert(math3d.aabb_isvalid(mergeaabb))
