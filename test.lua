@@ -115,7 +115,7 @@ do
 
 	local ray = {o = math3d.vector(0, 10, 0), d = math3d.vector(0.0, -3, 0.0)}
 	local tt = math3d.plane_ray(ray.o, ray.d, plane)
-	if tt == 0 then
+	if tt == nil then
 		print "plane parallel with ray"
 	elseif tt < 0 then
 		print "plane intersetion in ray backward"
