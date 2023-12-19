@@ -2037,6 +2037,14 @@ laabb_points(lua_State *L){
 }
 
 static int
+laabb_planes(lua_State *L){
+	struct math_context *M = GETMC(L);
+	math_t aabb = aabb_from_index(L, M, 1);
+	lua_pushmath(L, math3d_aabb_planes(M, aabb));
+	return 1;
+}
+
+static int
 laabb_expand(lua_State *L){
 	struct math_context *M = GETMC(L);
 	math_t aabb = aabb_from_index(L, M, 1);
@@ -2131,6 +2139,17 @@ lfrustum_intersect_aabb_list(lua_State *L) {
 			lua_seti(L, -2, ++returnidx);
 		}
 	}
+	return 1;
+}
+
+static int
+lfrustum_aabb_intersect_points(lua_State *L){
+	struct math_context *M = GETMC(L);
+	math_t m = matrix_from_index(L, M, 1);
+	math_t aabb = aabb_from_index(L, M, 2);
+
+	const int HOMOGENEOUS_DEPTH = math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH);
+	lua_pushmath(L, math3d_frstum_aabb_intersect_points(M, m, aabb, HOMOGENEOUS_DEPTH));
 	return 1;
 }
 
@@ -2667,12 +2686,14 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "aabb_test_point",	 laabb_test_point},
 		{ "aabb_to_frustum",	 laabb_to_frustum},
 		{ "aabb_points",		 laabb_points},
+		{ "aabb_planes",		 laabb_planes},
 		{ "aabb_expand",		 laabb_expand},
 
 		//frustum
 		{ "frustum_planes", 		lfrustum_planes},
 		{ "frustum_intersect_aabb", lfrustum_intersect_aabb},
 		{ "frustum_intersect_aabb_list", lfrustum_intersect_aabb_list},
+		{ "frustum_aabb_intersect_points",lfrustum_aabb_intersect_points},
 		{ "frustum_points", 		lfrustum_points},
 		{ "frustum_calc_near_far",  lfrustum_calc_near_far},
 		{ "frustum_to_aabb",		lfrustum_to_aabb},
