@@ -405,17 +405,26 @@ do
 	assert(math3d.isequal(math3d.vector(1.0, 32.0, 36.0), math3d.array_index(mergeaabb, 2)))
 
 
-	local aabb = math3d.aabb(math3d.vector(-1, 1, -3), math3d.vector(1, 2, 0))
-	local insidept, outsidept, layonpt = math3d.vector(0, 1, 0), math3d.vector(-2, 0, 0), math3d.vector(1, 2, 0)
+	local aabb = math3d.aabb(math3d.vector(-1, 1, -1), math3d.vector(1, 2, 1))
+	local insidept, outsidept, layonpt = math3d.vector(0, 1.5, 0), math3d.vector(-2, 0, 0), math3d.vector(1, 2, 0)
 	local isinside	= assert(math3d.aabb_test_point(aabb, insidept) > 0)
 	local isoutside	= assert(math3d.aabb_test_point(aabb, outsidept) < 0)
-	local islayon	= assert(math3d.aabb_test_point(aabb, outsidept) == 0)
+	local islayon	= assert(math3d.aabb_test_point(aabb, layonpt) == 0)
 
 	print "aabb test point, aabb:" 
 	print("\tinside point:",	math3d.tostring(insidept), ", result:", isinside)
 	print("\toutside point:",	math3d.tostring(insidept), ", result:", isoutside)
 	print("\tlayon point:",		math3d.tostring(insidept), ", result:", islayon)
 
+	--create an aabb and ortho frustum, and make them overlap each other
+	local aabb = math3d.aabb(math3d.vector(-1, -1, 0), math3d.vector(1, 1, 1))
+	print("test intersect aabb points:", math3d.tostring(math3d.aabb_points(aabb)))
+
+	local projmat = math3d.projmat{ortho=true, l=-1, r=1, t=1, b=-1, n=0, f=1}
+	print("test frustum points:", math3d.tostring(math3d.frustum_points(projmat)))
+
+	local intersectpoints = math3d.frustum_aabb_intersect_points(projmat, aabb)
+	print("intersect points:", math3d.tostring(intersectpoints))
 end
 
 local r2l_mat = math3d.matrix{s={-1.0, 1.0, 1.0}}

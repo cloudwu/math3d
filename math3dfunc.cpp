@@ -1250,7 +1250,29 @@ enum PlaneName {
 	PN_top,
 	PN_near,
 	PN_far,
+	PN_count,
 };
+
+static inline const glm::vec3* V3P(const glm::vec4 &v4) { return (const glm::vec3*)(&v4.x);}
+static inline const glm::vec3& V3R(const glm::vec4 &v4) { return *V3P(v4);}
+math_t
+math3d_aabb_planes(struct math_context *M, math_t aabb){
+	// plane order: left, right, bottom, top, near, far, same with frustum plane order
+	math_t planes = math_import(M, NULL, MATH_TYPE_VEC4, 6);
+	glm::vec4* pp = (glm::vec4*)(math_value(M, planes));
+
+	const glm::vec4* minv = (const glm::vec4*)math_value(M, aabb);
+	const glm::vec4* maxv = minv + 1;
+	pp[PN_left].w 	= glm::dot(glm::vec3( 1.f, 0.f, 0.f), V3R(*minv));
+	pp[PN_bottom].w = glm::dot(glm::vec3( 0.f, 1.f, 0.f), V3R(*minv));
+	pp[PN_near].w 	= glm::dot(glm::vec3( 0.f, 0.f, 1.f), V3R(*minv));
+
+	pp[PN_right].w 	= glm::dot(glm::vec3(-1.f, 0.f, 0.f), V3R(*maxv));
+	pp[PN_top].w 	= glm::dot(glm::vec3( 0.f,-1.f, 0.f), V3R(*maxv));
+	pp[PN_far].w 	= glm::dot(glm::vec3( 0.f, 0.f,-1.f), V3R(*maxv));
+
+	return planes;
+}
 
 math_t
 math3d_frustum_planes(struct math_context *M, math_t m, int homogeneous_depth) {
@@ -1340,6 +1362,19 @@ math3d_frustum_intersect_aabb(struct math_context *M, math_t planes, math_t aabb
 	return r;
 }
 
+enum BoxPoint {
+	BP_lbn = 0,
+	BP_ltn,
+	BP_rbn,
+	BP_rtn,
+
+	BP_lbf,
+	BP_ltf,
+	BP_rbf,
+	BP_rtf,
+
+	BP_count,
+};
 // point: [
 //	lbn, ltn, rbn, rtn, 
 //	lbf, ltf, rbf, rtf, 
@@ -1461,4 +1496,62 @@ bool intersect_triangle3(const glm::vec3& orig, const glm::vec3& dir,
 int
 math3d_ray_triangle_interset(struct math_context *M, math_t o, math_t d, math_t v0, math_t v1, math_t v2, struct ray_triangle_interset_result *r){
 	return intersect_triangle3(VEC3(M, o), VEC3(M, d), VEC3(M, v0), VEC3(M, v1), VEC3(M, v2), *r);
+}
+
+// face normal point to box center
+static constexpr uint8_t FACE_INDICES[PN_count * 4] = {
+	BP_lbn, BP_ltn, BP_lbf, BP_ltf, //left
+	BP_rbf, BP_rtf, BP_rbn, BP_rtn, //right
+
+	BP_lbn, BP_lbf, BP_rbn, BP_rbf, //bottom
+	BP_ltf, BP_ltn, BP_rtf, BP_rtn, //top
+
+	BP_rbn, BP_rtn, BP_lbn, BP_ltn, //near
+	BP_lbf, BP_ltf, BP_rbf, BP_rtf, //far
+};
+
+static constexpr uint8_t TRI_INDICES_IN_FACE[6] = {0, 1, 2, 1, 3, 2};
+
+static glm::vec4& GETPT(struct math_context * M, math_t points, int idx){ return *(glm::vec4*)(math_value(M, math_index(M, points, idx))); }
+
+static inline void
+ray_interset_box(struct math_context * M, math_t boxpoints, const glm::vec4 &p0, const glm::vec4& p1, glm::vec4 *resultpoints, int& numpoint){
+	const auto d = p1 - p0;
+	for (uint8_t iface=0; iface<PN_count; ++iface){
+		const uint8_t ifaceidx = iface*4;
+		for (uint8_t it=0; it<6; it += 3){
+			const uint8_t v0idx = FACE_INDICES[ifaceidx+TRI_INDICES_IN_FACE[it+0]];
+			const uint8_t v1idx = FACE_INDICES[ifaceidx+TRI_INDICES_IN_FACE[it+1]];
+			const uint8_t v2idx = FACE_INDICES[ifaceidx+TRI_INDICES_IN_FACE[it+2]];
+
+			const auto& v0 = GETPT(M, boxpoints, v0idx);
+			const auto& v1 = GETPT(M, boxpoints, v1idx);
+			const auto& v2 = GETPT(M, boxpoints, v2idx);
+
+			ray_triangle_interset_result r;
+			if (intersect_triangle3(V3R(p0), V3R(d), V3R(v0), V3R(v1), V3R(v2), r) && 0.f <= r.t && r.t <= 1.f){
+				resultpoints[numpoint] = p0 + d * r.t;
+				numpoint++;
+				break;	// break when we found
+			}
+		}
+	}
+}
+
+math_t
+math3d_frstum_aabb_intersect_points(struct math_context * M, math_t m, math_t aabb, int HOMOGENEOUS_DEPTH){
+	const math_t frustumpoints	= math3d_frustum_points(M, m, HOMOGENEOUS_DEPTH);
+	const math_t aabbpoints		= math3d_aabb_points(M, aabb);
+
+	int numpoint = 0;
+	constexpr int MAXPOINT = 16;
+	glm::vec4 points[MAXPOINT];
+	
+	for (uint8_t il=0; il<4; ++il){
+		// generate line from aabbpoints and frustumpoints
+		ray_interset_box(M, frustumpoints,	GETPT(M, aabbpoints, il), 	GETPT(M, aabbpoints, il+4), 	points, numpoint);
+		ray_interset_box(M, aabbpoints, 	GETPT(M, frustumpoints, il),GETPT(M, frustumpoints, il+4), 	points, numpoint);
+	}
+
+	return math_import(M, (const float*)(&points), MATH_TYPE_VEC4, numpoint);
 }
