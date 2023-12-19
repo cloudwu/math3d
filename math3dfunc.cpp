@@ -1195,15 +1195,16 @@ math3d_aabb_test_point(struct math_context *M, math_t aabb, math_t v) {
 	const float * minv = &aabb_value[0];
 	const float * maxv = &aabb_value[4];
 
+	int where = 1;
 	int ii;
 	for (ii=0;ii<3;++ii){
 		if (minv[ii] > p[ii] || maxv[ii] < p[ii])
 			return -1;
 		if (minv[ii] == p[ii] || maxv[ii] == p[ii])
-			return 0;
+			where = 0;
 	}
 
-	return 1;
+	return where;
 }
 
 math_t

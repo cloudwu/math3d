@@ -404,6 +404,18 @@ do
 	assert(math3d.isequal(math3d.vector(-20.0, -3.0, -5.0), math3d.array_index(mergeaabb, 1)))
 	assert(math3d.isequal(math3d.vector(1.0, 32.0, 36.0), math3d.array_index(mergeaabb, 2)))
 
+
+	local aabb = math3d.aabb(math3d.vector(-1, 1, -3), math3d.vector(1, 2, 0))
+	local insidept, outsidept, layonpt = math3d.vector(0, 1, 0), math3d.vector(-2, 0, 0), math3d.vector(1, 2, 0)
+	local isinside	= assert(math3d.aabb_test_point(aabb, insidept) > 0)
+	local isoutside	= assert(math3d.aabb_test_point(aabb, outsidept) < 0)
+	local islayon	= assert(math3d.aabb_test_point(aabb, outsidept) == 0)
+
+	print "aabb test point, aabb:" 
+	print("\tinside point:",	math3d.tostring(insidept), ", result:", isinside)
+	print("\toutside point:",	math3d.tostring(insidept), ", result:", isoutside)
+	print("\tlayon point:",		math3d.tostring(insidept), ", result:", islayon)
+
 end
 
 local r2l_mat = math3d.matrix{s={-1.0, 1.0, 1.0}}
