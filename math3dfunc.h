@@ -72,8 +72,10 @@ math_t math3d_frustum_center(struct math_context *, math_t points);
 float  math3d_frustum_max_radius(struct math_context *, math_t points, math_t center);
 
 math_t math3d_frusutm_aabb(struct math_context *, math_t points);
+int    math3d_frustum_test_point(struct math_context * M, math_t planes, math_t p);
 math_t math3d_frstum_aabb_intersect_points(struct math_context *M, math_t m, math_t aabb, int HOMOGENEOUS_DEPTH);
 
+math_t math3d_ray_intersect_box(struct math_context * M, math_t o, math_t d, math_t boxpoints);
 float  math3d_point2plane(struct math_context *, math_t pt, math_t plane);
 
 struct ray_triangle_interset_result { float t; float u, v; };

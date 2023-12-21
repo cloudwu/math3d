@@ -127,30 +127,73 @@ do
 	print(math3d.tostring(intersetion_pt))
 end
 
+local function create_ray(p1, p2)
+	return {o=p1, d=math3d.sub(p2, p1)}
+end
+local function print_with_tab(s, tabnum)
+	print(('\t'):rep(tabnum or 0) .. s)
+end
+local function print_ray(r, tabnum)
+	print_with_tab(("ray.o:%s, ray.d:%s"):format(math3d.tostring(r.o), math3d.tostring(r.d)), tabnum)
+end
+
+local function print_triangle(v0, v1, v2, tabnum)
+	print_with_tab(("triangles:%s, %s, %s"):format(math3d.tostring(v0), math3d.tostring(v1), math3d.tostring(v2)), tabnum)
+end
+
+local function print_points(points, tabnum)
+	local t = {}
+	local tab = ('\t'):rep(tabnum or 0)
+	for i=1, math3d.array_size(points) do
+		local p = math3d.array_index(points, i)
+		t[#t+1] = tab .. math3d.tostring(p)
+	end
+	print(table.concat(t, "\n"))
+end
+
+local corner_names = {
+	"lbn", "ltn", "rbn", "rtn",
+	"lbf", "ltf", "rbf", "rtf",
+}
+
+local function print_box_points(points, tabnum)
+	assert(math3d.array_size(points) == 8)
+
+
+	local function point_name(pidx, tabnum)
+		return ('\t'):rep(tabnum or 0) .. ("%s: %s"):format(corner_names[pidx], math3d.tostring(math3d.array_index(points, pidx)))
+	end
+
+	local function point_pairs(pidx1, pidx2, tabnum)
+		return ("%s;\t%s"):format(point_name(pidx1, tabnum), point_name(pidx2))
+	end
+	local t = {
+		point_pairs(1, 5, tabnum),
+		point_pairs(2, 6, tabnum),
+		point_pairs(3, 7, tabnum),
+		point_pairs(4, 8, tabnum),
+	}
+
+	return print(table.concat(t, "\n"))
+end
+
 print "----- ray/line interset with triangles -----"
 do
 	local v0, v1, v2 = math3d.vector(-1.0, 0.0, 0.0, 1.0), math3d.vector(0.0, 1.0, 0.0, 1.0), math3d.vector(1.0, 0.0, 0.0, 1.0)
 	print "\ttriangle1:"
-	print("\tv0:", math3d.tostring(v0))
-	print("\tv1:", math3d.tostring(v1))
-	print("\tv2:", math3d.tostring(v2))
+	print_triangle(v0, v1, v2, 1)
 
 	local v3, v4, v5 = math3d.vector(-1.0, 0.0, 2.0, 1.0), math3d.vector(0.0, 1.0, 2.0, 1.0), math3d.vector(1.0, 0.0, 2.0, 1.0)
 	print "\ttriangle2:"
-	print("\tv3:", math3d.tostring(v3))
-	print("\tv4:", math3d.tostring(v4))
-	print("\tv5:", math3d.tostring(v5))
+	print_triangle(v3, v4, v5, 1)
 
 	local v6, v7, v8 = math3d.vector(0.0, 0.0, 1.0, 1.0), math3d.vector(0.0, 1.0, 0.0, 1.0), math3d.vector(0.0, 0.0, -1.0, 1.0)
 	print "\ttriangle3:"
-	print("\tv6:", math3d.tostring(v6))
-	print("\tv7:", math3d.tostring(v7))
-	print("\tv8:", math3d.tostring(v8))
+	print_triangle(v6, v7, v8, 1)
 
 	local ray = {o=math3d.vector(0.0, 0.0, 0.0), d=math3d.vector(0.0, 0.0, 1.0)}
 	print "\tinterset with ray:"
-	print("\tray.origin:", math3d.tostring(ray.o))
-	print("\tray.direction:", math3d.tostring(ray.d))
+	print_ray(ray, 1)
 
 	print "\tsegment1 interset with triangle:"
 	local s0, s1 = math3d.vector(0, 0, 1, 1), math3d.vector(0, 0, 3, 1)
@@ -160,7 +203,7 @@ do
 
 	local interset, t = math3d.triangle_ray(ray.o, ray.d, v0, v1, v2)
 	if interset then
-		print("\tray triangle interset result:%f, point:%s", t, math3d.tostring(math3d.muladd(ray.d, t, ray.o)))
+		print(("\tray triangle interset result:%f, point:%s"):format(t, math3d.tostring(math3d.muladd(ray.d, t, ray.o))))
 	else
 		print "\tray NOT interset with triangle"
 	end
@@ -173,7 +216,60 @@ do
 	print("\tsegment interset with triangle2: ", interset, "t: ", t, "is in the segment:", 0<=t and t<=1.0)
 
 	interset, t = math3d.triangle_ray(s0, math3d.sub(s1, s0), v6, v7, v8)
-	print("\tsegment interset with triangle3: ", interset, "t: ", t)
+	print("\tsegment interset with triangle3: ", interset, "t: ", t or "no intersect")
+
+	print "\tray intersect with box:"
+	local boxcorners = {math3d.vector(-1.0, -1.0, -1.0), math3d.vector(1.0, 1.0, 1.0)}
+	local aabb = math3d.aabb(boxcorners[1], boxcorners[2])
+	local aabbpoints = math3d.aabb_points(aabb)
+
+	print "\tray intersect with aabb points:"
+	print_box_points(aabbpoints, 2)
+
+	local ray1 = {o=math3d.vector(0.0, 0.0, 0.0, 1.0), d=math3d.vector(0.0, 0.0, -1.0)}
+	local function do_ray_box_test(ray, boxpoints)
+		print "\tray:"
+		print_ray(ray, 2)
+		local resultpoints = math3d.ray_intersect_box(ray.o, ray.d, boxpoints)
+		print "\tray intersect results:"
+		print_points(resultpoints, 2)
+		return resultpoints
+	end
+
+	print "\tray box test 1:"
+	local results = do_ray_box_test(ray1, aabbpoints)
+	assert(math3d.array_size(results) == 1)
+
+	print "\tray box test 2:"
+	local ray2 = create_ray(math3d.vector(0.0, 0.0, -1.0, 1.0), math3d.vector(-1.0, 0.0, 0.0, 1.0))
+	results = do_ray_box_test(ray2, aabbpoints)
+	assert(math3d.array_size(results) == 2)
+
+	print "\tray box test 3:"
+	--local ray3 = create_ray(math3d.array_index(aabbpoints, 1), math3d.array_index(aabbpoints, 5))
+	local ray3 = create_ray(math3d.vector(0.0, 0.0, -1.0, 1.0), math3d.vector(0.0, 0.0, 1.0, 1.0))
+	results = do_ray_box_test(ray3, aabbpoints)
+	assert(math3d.array_size(results) == 2)
+
+	print "\tray box test 4:"
+	local ray4 = create_ray(math3d.vector(-1.0, 0.0, 0.0, 1.0), math3d.vector(1.0, 0.0, 1.0, 1.0))
+	results = do_ray_box_test(ray4, aabbpoints)
+	assert(math3d.array_size(results) == 3)
+
+	local aabb2 = math3d.aabb(math3d.vector(0.0, 0.0, 0.0, 0.0), math3d.vector(2.0, 2.0, 2.0, 0.0))
+	local aabbpoints2 = math3d.aabb_points(aabb2)
+	print "\taabb2 points:"
+	print_box_points(aabbpoints2, 2)
+
+	print "\tray box test 5:"
+	local ray5 = create_ray(math3d.vector(0.0, 0.0, 0.0, 1.0), math3d.vector(2.0, 2.0, 2.0, 1.0))
+	results = do_ray_box_test(ray5, aabbpoints2)
+	assert(math3d.array_size(results) == 6)
+
+	print "\tray box test 6:"
+	local ray6 = create_ray(math3d.vector(1.0, 1.0, -1.0, 1.0), math3d.vector(2.0, 2.0, 2.0, 1.0))
+	results = do_ray_box_test(ray6, aabbpoints2)
+	assert(math3d.array_size(results) == 4)
 end
 
 print "===SRT==="
@@ -196,7 +292,7 @@ end
 
 print "===QUAT==="
 do
-	local q = math3d.quaternion { 0, math.rad(60, 0), 0 }
+	local q = math3d.quaternion { 0, math.rad(60), 0 }
 	print(math3d.tostring(q))
 	ref3 = math3d.ref()
 	ref3.m = math3d.quaternion { axis = {1,0,0}, r = math.rad(60) } -- init mat with quat
@@ -337,15 +433,7 @@ do
 
 	print("aabb:", math3d.tostring(aabb))
 
-	local frustum_point_names = {
-		"lbn", "rbn", "ltn", "rtn",
-		"lbf", "rbf", "ltf", "rtf",
-	}
-	local frustuminfo={}
-	for i=1, 8 do
-		frustuminfo[#frustuminfo+1] = frustum_point_names[i] .. ":" .. math3d.tostring(math3d.array_index(frustum_points, i))
-	end
-	print("frustum:\n", table.concat(frustuminfo, ",\n\t"))
+	print_box_points(frustum_points)
 
 	if intersectresult > 0 then
 		print("aabb inside frustum")
@@ -369,6 +457,11 @@ do
 	print("frusutm aabb center:", math3d.tostring(f_aabb_center), "extents:", math3d.tostring(f_aabb_extents), "radius:", math3d.length(f_aabb_extents))
 ]]
 	print "\t===AABB&minmax===="
+	do
+		local p = math3d.vector(0.0, 0.0, 0.0, 1.0)
+		print("frustum test point:", math3d.frustum_test_point(math3d.frustum_planes(math3d.projmat{ortho=true, l=-1, r=1, b=-1, t=1, n=-1, f=1}), p))
+	end
+
 	local points = {
 		math3d.vector(1, 0, -1, -10),
 		math3d.vector(1, 2, -1, 1),
@@ -417,14 +510,30 @@ do
 	print("\tlayon point:",		math3d.tostring(insidept), ", result:", islayon)
 
 	--create an aabb and ortho frustum, and make them overlap each other
-	local aabb = math3d.aabb(math3d.vector(-1, -1, 0), math3d.vector(1, 1, 1))
-	print("test intersect aabb points:", math3d.tostring(math3d.aabb_points(aabb)))
+	local aabb = math3d.aabb(math3d.vector(-1, -1, -1), math3d.vector(1, 1, 1))
+	print "\t1. test aabb points:"
+	print_box_points(math3d.aabb_points(aabb), 2)
 
 	local projmat = math3d.projmat{ortho=true, l=-1, r=1, t=1, b=-1, n=0, f=1}
-	print("test frustum points:", math3d.tostring(math3d.frustum_points(projmat)))
+	print "\t1. test frustum point:"
+	print_box_points(math3d.frustum_points(projmat), 2)
 
 	local intersectpoints = math3d.frustum_aabb_intersect_points(projmat, aabb)
-	print("intersect points:", math3d.tostring(intersectpoints))
+	print "\t1. intersect results:"
+	print_points(intersectpoints, 2)
+
+	local aabb2 = math3d.aabb(math3d.vector(-2, -2, -2), math3d.vector(2, 2, 2))
+	print "\t2. test aabb points:"
+	local aabbpoints2 = math3d.aabb_points(aabb2)
+	print_box_points(aabbpoints2, 2)
+	local projmat2 = math3d.projmat{l=-1, r=1, t=1, b=-1, n = 1, f=10}
+	print "\t2. test frustum point:"
+	local f2points = math3d.frustum_points(projmat2)
+	print_box_points(f2points, 2)
+
+	intersectpoints = math3d.frustum_aabb_intersect_points(projmat2, aabb2)
+	print "\t2. intersect results:"
+	print_points(intersectpoints, 2)
 end
 
 local r2l_mat = math3d.matrix{s={-1.0, 1.0, 1.0}}

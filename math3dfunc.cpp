@@ -200,6 +200,9 @@ VEC3(struct math_context *M, math_t v3) {
 	return *(const glm::vec3 *)(v);
 }
 
+static inline const glm::vec3* V3P(const glm::vec4 &v4) { return (const glm::vec3*)(&v4.x);}
+static inline const glm::vec3& V3R(const glm::vec4 &v4) { return *V3P(v4);}
+
 struct AABB {
 	const glm::vec4 &minv;
 	const glm::vec4 &maxv;
@@ -600,11 +603,9 @@ math3d_inverse_matrix_fast(struct math_context *M, math_t mat) {
 	
 	glm::mat4x4 &r = allocmat(M, &id);
 	r = m;
-
-	#define V3(V4) (*(const glm::vec3*)(&(V4)))
-	assert(	is_zero(glm::dot(V3(m[0]), V3(m[1])), 1e-6f) &&
-			is_zero(glm::dot(V3(m[1]), V3(m[2])), 1e-6f) &&
-			is_zero(glm::dot(V3(m[2]), V3(m[0])), 1e-6f));
+	assert(	is_zero(glm::dot(V3R(m[0]), V3R(m[1])), 1e-6f) &&
+			is_zero(glm::dot(V3R(m[1]), V3R(m[2])), 1e-6f) &&
+			is_zero(glm::dot(V3R(m[2]), V3R(m[0])), 1e-6f));
 
 	// DOT not write: auto m3 = (glm::mat3*)(&m);
 	// transpose 3x3
@@ -615,7 +616,7 @@ math3d_inverse_matrix_fast(struct math_context *M, math_t mat) {
 	glm::vec3& c3 = *(glm::vec3*)(&r[3]);
 
 	// rotate t -> T = r * t ==> glm::vec3(dot(row0(r), t), dot(row1(r), t), dot(row2(r), t), here row0(r) = col0(m)
-	c3 = -glm::vec3(glm::dot(V3(m[0]), c3), glm::dot(V3(m[1]), c3), glm::dot(V3(m[2]), c3));
+	c3 = -glm::vec3(glm::dot(V3R(m[0]), c3), glm::dot(V3R(m[1]), c3), glm::dot(V3R(m[2]), c3));
 	return id;
 }
 
@@ -1207,23 +1208,37 @@ math3d_aabb_test_point(struct math_context *M, math_t aabb, math_t v) {
 	return where;
 }
 
+enum BoxPoint {
+	BP_lbn = 0,
+	BP_ltn,
+	BP_rbn,
+	BP_rtn,
+
+	BP_lbf,
+	BP_ltf,
+	BP_rbf,
+	BP_rtf,
+
+	BP_count,
+};
+
 math_t
 math3d_aabb_points(struct math_context *M, math_t aabb) {
 	auto t = AABB(M, aabb);
 
-	math_t r = math_import(M, NULL, MATH_TYPE_VEC4, 8);
+	math_t r = math_import(M, NULL, MATH_TYPE_VEC4, BP_count);
 
-	auto v = math_value(M, r);
+	glm::vec4* points = (glm::vec4*)math_value(M, r);
 
-	*(glm::vec4*)v 		= t.minv;
-	*((glm::vec4*)v+1)	= glm::vec4(t.minv.x, t.maxv.y, t.minv.z, 0);
-	*((glm::vec4*)v+2)	= glm::vec4(t.maxv.x, t.minv.y, t.minv.z, 0);
-	*((glm::vec4*)v+3)	= glm::vec4(t.maxv.x, t.maxv.y, t.minv.z, 0);
-	                                  
-	*((glm::vec4*)v+4) = glm::vec4(t.minv.x, t.minv.y, t.maxv.z, 0);
-	*((glm::vec4*)v+5) = glm::vec4(t.minv.x, t.maxv.y, t.maxv.z, 0);
-	*((glm::vec4*)v+6) = glm::vec4(t.maxv.x, t.minv.y, t.maxv.z, 0);
-	*((glm::vec4*)v+7) = t.maxv;
+	points[BP_lbn] = t.minv;
+	points[BP_ltn] = glm::vec4(t.minv.x, t.maxv.y, t.minv.z, 0);
+	points[BP_rbn] = glm::vec4(t.maxv.x, t.minv.y, t.minv.z, 0);
+	points[BP_rtn] = glm::vec4(t.maxv.x, t.maxv.y, t.minv.z, 0);
+
+	points[BP_lbf] = glm::vec4(t.minv.x, t.minv.y, t.maxv.z, 0);
+	points[BP_ltf] = glm::vec4(t.minv.x, t.maxv.y, t.maxv.z, 0);
+	points[BP_rbf] = glm::vec4(t.maxv.x, t.minv.y, t.maxv.z, 0);
+	points[BP_rtf] = t.maxv;
 
 	return r;
 }
@@ -1253,23 +1268,26 @@ enum PlaneName {
 	PN_count,
 };
 
-static inline const glm::vec3* V3P(const glm::vec4 &v4) { return (const glm::vec3*)(&v4.x);}
-static inline const glm::vec3& V3R(const glm::vec4 &v4) { return *V3P(v4);}
 math_t
 math3d_aabb_planes(struct math_context *M, math_t aabb){
-	// plane order: left, right, bottom, top, near, far, same with frustum plane order
-	math_t planes = math_import(M, NULL, MATH_TYPE_VEC4, 6);
+	math_t planes = math_import(M, NULL, MATH_TYPE_VEC4, PN_count);
 	glm::vec4* pp = (glm::vec4*)(math_value(M, planes));
 
 	const glm::vec4* minv = (const glm::vec4*)math_value(M, aabb);
 	const glm::vec4* maxv = minv + 1;
-	pp[PN_left].w 	= glm::dot(glm::vec3( 1.f, 0.f, 0.f), V3R(*minv));
-	pp[PN_bottom].w = glm::dot(glm::vec3( 0.f, 1.f, 0.f), V3R(*minv));
-	pp[PN_near].w 	= glm::dot(glm::vec3( 0.f, 0.f, 1.f), V3R(*minv));
 
-	pp[PN_right].w 	= glm::dot(glm::vec3(-1.f, 0.f, 0.f), V3R(*maxv));
-	pp[PN_top].w 	= glm::dot(glm::vec3( 0.f,-1.f, 0.f), V3R(*maxv));
-	pp[PN_far].w 	= glm::dot(glm::vec3( 0.f, 0.f,-1.f), V3R(*maxv));
+	auto create_plane = [](const glm::vec3& n, const glm::vec3& p) {
+		const float d = glm::dot(n, p);
+		return glm::vec4(n, d);
+	};
+
+	pp[PN_left]		= create_plane(glm::vec3( 1.f, 0.f, 0.f), V3R(*minv));
+	pp[PN_bottom]	= create_plane(glm::vec3( 0.f, 1.f, 0.f), V3R(*minv));
+	pp[PN_near]		= create_plane(glm::vec3( 0.f, 0.f, 1.f), V3R(*minv));
+
+	pp[PN_right]	= create_plane(glm::vec3(-1.f, 0.f, 0.f), V3R(*maxv));
+	pp[PN_top] 		= create_plane(glm::vec3( 0.f,-1.f, 0.f), V3R(*maxv));
+	pp[PN_far] 		= create_plane(glm::vec3( 0.f, 0.f,-1.f), V3R(*maxv));
 
 	return planes;
 }
@@ -1362,26 +1380,8 @@ math3d_frustum_intersect_aabb(struct math_context *M, math_t planes, math_t aabb
 	return r;
 }
 
-enum BoxPoint {
-	BP_lbn = 0,
-	BP_ltn,
-	BP_rbn,
-	BP_rtn,
-
-	BP_lbf,
-	BP_ltf,
-	BP_rbf,
-	BP_rtf,
-
-	BP_count,
-};
-// point: [
-//	lbn, ltn, rbn, rtn, 
-//	lbf, ltf, rbf, rtf, 
-//]
-
 struct frustum_corners {
-	glm::vec4 c[8];
+	glm::vec4 c[BP_count];
 	static constexpr frustum_corners corners(float n, float f) {
 		return frustum_corners {
 			.c = {
@@ -1404,9 +1404,9 @@ static const frustum_corners ndc_points_NO = frustum_corners::corners(-1.f, 1.f)
 
 static math_t
 math3d_frustum_points_(struct math_context *M, math_t m, const frustum_corners& fc) {
-	math_t result = math_import(M, NULL, MATH_TYPE_VEC4, 8);
+	math_t result = math_import(M, NULL, MATH_TYPE_VEC4, BP_count);
 	auto invmat = glm::inverse(MAT(M, m));
-	for (int ii = 0; ii < 8; ++ii){
+	for (int ii = 0; ii < BP_count; ++ii){
 		auto &p = initvec4(M, math_index(M, result, ii));
 		p = invmat * fc.c[ii];
 		p /= p.w;
@@ -1514,9 +1514,22 @@ static constexpr uint8_t TRI_INDICES_IN_FACE[6] = {0, 1, 2, 1, 3, 2};
 
 static glm::vec4& GETPT(struct math_context * M, math_t points, int idx){ return *(glm::vec4*)(math_value(M, math_index(M, points, idx))); }
 
-static inline void
-ray_interset_box(struct math_context * M, math_t boxpoints, const glm::vec4 &p0, const glm::vec4& p1, glm::vec4 *resultpoints, int& numpoint){
-	const auto d = p1 - p0;
+static constexpr uint8_t MAX_INTERSECT_POINTS = 2;
+
+//one line intersect with a box, the max points is 6: intersect 2 corners of the box will generate 6 intersect points
+static inline uint8_t
+ray_interset_box(struct math_context * M, const glm::vec4 &o, const glm::vec4& d, math_t boxpoints, glm::vec4 *resultpoints){
+	uint8_t numpoint = 0;
+	float samet[3] = {0};
+	uint8_t numt = 0;
+	auto check_addt = [&numt, &samet](float t) {
+		for (uint8_t ii=0; ii<numt; ++ii){
+			if (std::fabs(samet[ii] - t)>1e-6f)
+				return false;
+		}
+		samet[numt++] = t;
+		return true;
+	};
 	for (uint8_t iface=0; iface<PN_count; ++iface){
 		const uint8_t ifaceidx = iface*4;
 		for (uint8_t it=0; it<6; it += 3){
@@ -1529,29 +1542,99 @@ ray_interset_box(struct math_context * M, math_t boxpoints, const glm::vec4 &p0,
 			const auto& v2 = GETPT(M, boxpoints, v2idx);
 
 			ray_triangle_interset_result r;
-			if (intersect_triangle3(V3R(p0), V3R(d), V3R(v0), V3R(v1), V3R(v2), r) && 0.f <= r.t && r.t <= 1.f){
-				resultpoints[numpoint] = p0 + d * r.t;
-				numpoint++;
+			if (intersect_triangle3(V3R(o), V3R(d), V3R(v0), V3R(v1), V3R(v2), r) && 0.f <= r.t && r.t <= 1.f && check_addt(r.t)){
+				assert(numpoint < MAX_INTERSECT_POINTS);
+				resultpoints[numpoint++] = o + d * r.t;
 				break;	// break when we found
 			}
 		}
 	}
+	return numpoint;
+}
+
+math_t
+math3d_ray_intersect_box(struct math_context * M, math_t o, math_t d, math_t boxpoints){
+	glm::vec4 points[MAX_INTERSECT_POINTS];
+
+	const uint8_t n = ray_interset_box(M, VEC(M, o), VEC(M, d), boxpoints, points);
+	return math_import(M, (const float*)points, MATH_TYPE_VEC4, n);
+}
+
+int
+math3d_frustum_test_point(struct math_context * M, math_t planes, math_t p){
+	const auto& v3p = VEC3(M, p);
+	int where = 1;
+	for (int ii=0; ii<6; ++ii){
+		const auto& plane = VEC(M, math_index(M, planes, ii));
+		const float d = dot(V3R(plane), v3p);
+		// outside frustum
+		if (d < 0){
+			return -1;
+		}
+
+		if (std::fabs(d - plane.w) < 1e-6f){
+			where = 0;
+		}
+	}
+
+	return where;
 }
 
 math_t
 math3d_frstum_aabb_intersect_points(struct math_context * M, math_t m, math_t aabb, int HOMOGENEOUS_DEPTH){
-	const math_t frustumpoints	= math3d_frustum_points(M, m, HOMOGENEOUS_DEPTH);
-	const math_t aabbpoints		= math3d_aabb_points(M, aabb);
-
 	int numpoint = 0;
-	constexpr int MAXPOINT = 16;
+
+	constexpr int MAXPOINT = 64;
 	glm::vec4 points[MAXPOINT];
-	
-	for (uint8_t il=0; il<4; ++il){
-		// generate line from aabbpoints and frustumpoints
-		ray_interset_box(M, frustumpoints,	GETPT(M, aabbpoints, il), 	GETPT(M, aabbpoints, il+4), 	points, numpoint);
-		ray_interset_box(M, aabbpoints, 	GETPT(M, frustumpoints, il),GETPT(M, frustumpoints, il+4), 	points, numpoint);
+
+	const math_t frustumpoints	= math3d_frustum_points(M, m, HOMOGENEOUS_DEPTH);
+
+	auto test_points_in_box = [M, &numpoint, &points](math_t testpoints, auto checkop){
+		uint8_t n = 0;
+		for (uint8_t ii=0; ii<BP_count;++ii){
+			math_t p = math_index(M, testpoints, ii);
+			if (checkop(p)){
+				points[n++] = VEC(M, p);
+			}
+		}
+
+		numpoint += n;
+		return n;
+	};
+
+	if (8 == test_points_in_box(frustumpoints, [M, aabb](math_t p){ return math3d_aabb_test_point(M, aabb, p) >= 0; })){
+		return math_import(M, (const float*)(&points), MATH_TYPE_VEC4, numpoint);
 	}
 
-	return math_import(M, (const float*)(&points), MATH_TYPE_VEC4, numpoint);
+	const math_t aabbpoints		= math3d_aabb_points(M, aabb);
+	const math_t frustumplanes	= math3d_frustum_planes(M, m, HOMOGENEOUS_DEPTH);
+
+	if (8 == test_points_in_box(aabbpoints, [M, frustumplanes](math_t p){ return math3d_frustum_test_point(M, frustumplanes, p) >= 0; })){
+		assert(numpoint == 8);
+		return math_import(M, (const float*)(&points), MATH_TYPE_VEC4, numpoint);
+	}
+
+	constexpr uint8_t MAXLINE_POINTS = 12*2;
+	constexpr uint8_t lineindices[MAXLINE_POINTS] = {
+		0, 4, 1, 5,
+		2, 6, 3, 7,
+
+		0, 2, 1, 3,
+		4, 6, 5, 7,
+
+		0, 1, 2, 3,
+		4, 5, 6, 7,
+	};
+
+	// from near to far
+	for (uint8_t il=0; il < MAXLINE_POINTS; il+=2){
+		// generate line from aabbpoints and frustumpoints
+		const uint8_t s0 = lineindices[il], s1 = lineindices[il+1];
+
+		numpoint += ray_interset_box(M, GETPT(M, aabbpoints, 	s0),GETPT(M, aabbpoints, 	s1), frustumpoints,	points+numpoint);
+		assert(numpoint <= MAXPOINT);
+		numpoint += ray_interset_box(M, GETPT(M, frustumpoints, s0),GETPT(M, frustumpoints, s1), aabbpoints,	points+numpoint);
+		assert(numpoint <= MAXPOINT);
+	}
+	return (numpoint > 0) ? math_import(M, (const float*)(&points), MATH_TYPE_VEC4, numpoint) : MATH_NULL;
 }

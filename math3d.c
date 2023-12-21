@@ -2143,6 +2143,15 @@ lfrustum_intersect_aabb_list(lua_State *L) {
 }
 
 static int
+lfrustum_test_point(lua_State *L){
+	struct math_context *M = GETMC(L);
+	math_t planes = array_from_index(L, M, 1, MATH_TYPE_VEC4);
+	math_t p = vector_from_index(L, M, 2);
+	lua_pushinteger(L, math3d_frustum_test_point(M, planes, p));
+	return 1;
+}
+
+static int
 lfrustum_aabb_intersect_points(lua_State *L){
 	struct math_context *M = GETMC(L);
 	math_t m = matrix_from_index(L, M, 1);
@@ -2212,6 +2221,20 @@ ltriangle_ray(lua_State *L){
 	}
 
 	lua_pushboolean(L, 0);
+	return 1;
+}
+
+static int
+lray_intersect_box(lua_State *L){
+	struct math_context *M = GETMC(L);
+	math_t o = vector_from_index(L, M, 1);
+	math_t d = vector_from_index(L, M, 2);
+	math_t points = array_from_index(L, M, 3, MATH_TYPE_VEC4);
+	if (8 != math_size(M, points)){
+		return luaL_error(L, "Need a box(with 8 points)");
+	}
+
+	lua_pushmath(L, math3d_ray_intersect_box(M, o, d, points));
 	return 1;
 }
 
@@ -2693,6 +2716,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "frustum_planes", 		lfrustum_planes},
 		{ "frustum_intersect_aabb", lfrustum_intersect_aabb},
 		{ "frustum_intersect_aabb_list", lfrustum_intersect_aabb_list},
+		{ "frustum_test_point",		lfrustum_test_point},
 		{ "frustum_aabb_intersect_points",lfrustum_aabb_intersect_points},
 		{ "frustum_points", 		lfrustum_points},
 		{ "frustum_calc_near_far",  lfrustum_calc_near_far},
@@ -2701,6 +2725,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		//primitive
 		{ "point2plane",	lpoint2plane},
 		{ "triangle_ray",	ltriangle_ray},
+		{ "ray_intersect_box", lray_intersect_box},
 
 		{ "marked_vector", lmarked_vector },
 		{ "marked_matrix", lmarked_matrix },
