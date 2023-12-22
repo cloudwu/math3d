@@ -1557,7 +1557,7 @@ math3d_ray_intersect_box(struct math_context * M, math_t o, math_t d, math_t box
 	glm::vec4 points[MAX_INTERSECT_POINTS];
 
 	const uint8_t n = ray_interset_box(M, VEC(M, o), VEC(M, d), boxpoints, points);
-	return math_import(M, (const float*)points, MATH_TYPE_VEC4, n);
+	return n > 0 ? math_import(M, (const float*)points, MATH_TYPE_VEC4, n) : MATH_NULL;
 }
 
 int
