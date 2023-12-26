@@ -1431,9 +1431,35 @@ math3d_frustum_calc_near_far(struct math_context *M, math_t planes, float result
 	result[1] = 0;
 }
 
+// plane define:
+//		nx * px + ny*py + nz*pz + d = 0 ==> dot(n, p) + d = 0, where n is normalize vector
+//	1 : in front of plane
+//	0 : lay on plane
+// -1 : in back of plane
 float
 math3d_point2plane(struct math_context *M, math_t pt, math_t plane) {
 	return glm::dot(VEC3(M, pt), VEC3(M, plane)) + VEC(M, plane)[3];
+}
+
+static inline int
+plane_test_point(const glm::vec4 &plane, const glm::vec3 &p){
+	const float d = dot(V3R(plane), p);
+	// outside frustum
+	const float delta = d + plane.w;
+	if (std::fabs(delta) < 1e-6f){
+		return 0;
+	}
+
+	if (delta < 0){
+		return -1;
+	}
+
+	return 1;
+}
+
+int
+math3d_plane_test_point(struct math_context * M, math_t plane, math_t p){
+	return plane_test_point(VEC(M, plane), VEC3(M, p));
 }
 
 // from: https://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/raytri/
@@ -1524,7 +1550,7 @@ ray_interset_box(struct math_context * M, const glm::vec4 &o, const glm::vec4& d
 	uint8_t numt = 0;
 	auto check_addt = [&numt, &samet](float t) {
 		for (uint8_t ii=0; ii<numt; ++ii){
-			if (std::fabs(samet[ii] - t)>1e-6f)
+			if (std::fabs(samet[ii] - t)<1e-6f)
 				return false;
 		}
 		samet[numt++] = t;
@@ -1564,15 +1590,14 @@ int
 math3d_frustum_test_point(struct math_context * M, math_t planes, math_t p){
 	const auto& v3p = VEC3(M, p);
 	int where = 1;
-	for (int ii=0; ii<6; ++ii){
+	for (int ii=0; ii<PN_count; ++ii){
 		const auto& plane = VEC(M, math_index(M, planes, ii));
-		const float d = dot(V3R(plane), v3p);
-		// outside frustum
-		if (d < 0){
+		const int w = plane_test_point(plane, v3p);
+		if (w < 0){
 			return -1;
 		}
 
-		if (std::fabs(d - plane.w) < 1e-6f){
+		if (w == 0){
 			where = 0;
 		}
 	}
