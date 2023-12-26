@@ -254,7 +254,7 @@ do
 	print "\tray box test 4:"
 	local ray4 = create_ray(math3d.vector(-1.0, 0.0, 0.0, 1.0), math3d.vector(1.0, 0.0, 1.0, 1.0))
 	results = do_ray_box_test(ray4, aabbpoints)
-	assert(math3d.array_size(results) == 3)
+	assert(math3d.array_size(results) == 2)
 
 	local aabb2 = math3d.aabb(math3d.vector(0.0, 0.0, 0.0, 0.0), math3d.vector(2.0, 2.0, 2.0, 0.0))
 	local aabbpoints2 = math3d.aabb_points(aabb2)
@@ -264,12 +264,12 @@ do
 	print "\tray box test 5:"
 	local ray5 = create_ray(math3d.vector(0.0, 0.0, 0.0, 1.0), math3d.vector(2.0, 2.0, 2.0, 1.0))
 	results = do_ray_box_test(ray5, aabbpoints2)
-	assert(math3d.array_size(results) == 6)
+	assert(math3d.array_size(results) == 2)
 
 	print "\tray box test 6:"
 	local ray6 = create_ray(math3d.vector(1.0, 1.0, -1.0, 1.0), math3d.vector(2.0, 2.0, 2.0, 1.0))
 	results = do_ray_box_test(ray6, aabbpoints2)
-	assert(math3d.array_size(results) == 4)
+	assert(math3d.array_size(results) == 2)
 end
 
 print "===SRT==="
@@ -443,24 +443,38 @@ do
 		print("aabb outside frustum")
 	end
 
-	local center = math3d.points_center(frustum_points)
-	local maxradius = math3d.points_radius(frustum_points, center)
---[[
-	local frustum_aabb = math3d.frustum_aabb(frustum_points)
+	print "\t===points_center&points_radius==="
+	do
+		local center = math3d.points_center(frustum_points)
+		local maxradius = math3d.points_radius(frustum_points, center)
 
-	print("frusutm center:", math3d.tostring(center))
-	print("frustum max radius:", maxradius)
+		local frustum_aabb = math3d.minmax(frustum_points)
+		local center1, extents = math3d.aabb_center_extents(frustum_aabb)
 
-	local f_aabb_min, f_aabb_max = math3d.index(frustum_aabb, 1), math3d.index(frustum_aabb, 2)
-	print("frusutm aabb min:", math3d.tostring(f_aabb_min), "max:", math3d.tostring(f_aabb_max))
-	local f_aabb_center, f_aabb_extents = math3d.aabb_center_extents(frustum_aabb)
-	print("frusutm aabb center:", math3d.tostring(f_aabb_center), "extents:", math3d.tostring(f_aabb_extents), "radius:", math3d.length(f_aabb_extents))
-]]
-	print "\t===AABB&minmax===="
+		assert(math3d.isequal(center, center1))
+		assert(maxradius == math3d.length(extents))
+
+		print "\t passed!"
+	end
+
+	print "\t===frustum test points==="
 	do
 		local p = math3d.vector(0.0, 0.0, 0.0, 1.0)
-		print("frustum test point:", math3d.frustum_test_point(math3d.frustum_planes(math3d.projmat{ortho=true, l=-1, r=1, b=-1, t=1, n=-1, f=1}), p))
+		local p1 = math3d.vector(0.0, 0.0, 10.0, 1.0)
+
+		local f = math3d.frustum_planes(math3d.projmat{ortho=true, l=-1, r=1, b=-1, t=1, n=-1, f=1})
+		assert(math3d.frustum_test_point(f, p) > 0)
+		assert(math3d.frustum_test_point(f, p1) < 0)
+		assert(math3d.frustum_test_point(f, math3d.vector(-1.0, 0.0, 0.0, 1.0)) == 0)
+
+		local f1 = math3d.frustum_planes(math3d.projmat{l=-1, r=1, b=-1, t=1, n=1, f=20})
+		assert(math3d.frustum_test_point(f1, p) < 0)
+		assert(math3d.frustum_test_point(f1, p1) > 0)
+
+		print "\t passed!"
 	end
+
+	print "\t===AABB&minmax===="
 
 	local points = {
 		math3d.vector(1, 0, -1, -10),

@@ -2204,6 +2204,15 @@ lpoint2plane(lua_State *L) {
 }
 
 static int
+lplane_test_point(lua_State *L){
+	struct math_context *M = GETMC(L);
+	math_t plane = vector_from_index(L, M, 1);
+	math_t pt = vector_from_index(L, M, 2);
+	lua_pushnumber(L, math3d_plane_test_point(M, plane, pt));
+	return 1;
+}
+
+static int
 ltriangle_ray(lua_State *L){
 	struct math_context *M = GETMC(L);
 	const math_t o = vector_from_index(L, M, 1);
@@ -2416,31 +2425,6 @@ lplane_ray(lua_State *L) {
 	lua_pushnumber(L, t);
 	return 1;
 }
-
-/*
-static int
-lfrustum_calc_near_far(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float* planes[6];
-	fetch_vectors_from_table(L, LS, 1, 6, planes);
-
-	float nearfar[2];
-	math3d_frustum_calc_near_far(LS, planes, nearfar);
-	lua_pushnumber(L, nearfar[0]);
-	lua_pushnumber(L, nearfar[1]);
-	return 2;
-}
-
-static int
-lpoint2plane(lua_State *L){
-	struct lastack *LS = GETLS(L);
-	const float *pt = vector_from_index(L, LS, 1);
-	const float *plane = vector_from_index(L, LS, 2);
-
-	lua_pushnumber(L, math3d_point2plane(LS, pt, plane));
-	return 1;
-}
-*/
 
 static int
 lvalue_ptr(lua_State *L){
@@ -2724,6 +2708,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 
 		//primitive
 		{ "point2plane",	lpoint2plane},
+		{ "plane_test_point",lplane_test_point},
 		{ "triangle_ray",	ltriangle_ray},
 		{ "ray_intersect_box", lray_intersect_box},
 
