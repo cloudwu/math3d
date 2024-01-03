@@ -863,12 +863,10 @@ math3d_minmax(struct math_context *M, math_t transform, math_t points) {
 		return MATH_NULL;
 
 	const math_t p = math_index(M, points, 0);
-	glm::vec4 minmax[2] = {
-		VEC(M, p),
-		VEC(M, p),
-	};
+	glm::vec4 minmax[2];
 
 	if (math_isnull(transform)){
+		minmax[0] = minmax[1] = VEC(M, p);
 		for (int ii=1; ii<numpoints; ++ii){
 			const auto& pp = VEC(M, math_index(M, points, ii));
 			minmax[0] = glm::min(minmax[0], pp);
@@ -876,6 +874,7 @@ math3d_minmax(struct math_context *M, math_t transform, math_t points) {
 		}
 	} else {
 		const glm::mat4& m = MAT(M, transform);
+		minmax[0] = minmax[1] = m * VEC(M, p);
 		for (int ii=1; ii<numpoints; ++ii){
 			const glm::vec4 tpp = m * VEC(M, math_index(M, points, ii));
 			minmax[0] = glm::min(minmax[0], tpp);
