@@ -1545,7 +1545,7 @@ static constexpr uint8_t MAX_INTERSECT_POINTS = 2;
 //one line intersect with a box, the max points is 6: intersect 2 corners of the box will generate 6 intersect points
 constexpr uint8_t MAX_POTENTIAL_INTERSECT_POINTS = 6;
 static inline bool check_add_t(float t, float *samet, uint8_t &numt) {
-	if (0.f <= t && t <= 1.f){
+	if (-1.f <= t && t <= 1.f){
 		for (uint8_t ii=0; ii<numt; ++ii){
 			if (std::fabs(samet[ii] - t)<1e-6f)
 				return false;
