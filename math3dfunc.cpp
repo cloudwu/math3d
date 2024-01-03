@@ -1543,19 +1543,28 @@ static glm::vec4& GETPT(struct math_context * M, math_t points, int idx){ return
 static constexpr uint8_t MAX_INTERSECT_POINTS = 2;
 
 //one line intersect with a box, the max points is 6: intersect 2 corners of the box will generate 6 intersect points
-static inline uint8_t
-ray_interset_box(struct math_context * M, const glm::vec4 &o, const glm::vec4& d, math_t boxpoints, glm::vec4 *resultpoints){
-	uint8_t numpoint = 0;
-	float samet[3] = {0};
-	uint8_t numt = 0;
-	auto check_addt = [&numt, &samet](float t) {
+constexpr uint8_t MAX_POTENTIAL_INTERSECT_POINTS = 6;
+static inline bool check_add_t(float t, float *samet, uint8_t &numt) {
+	if (0.f <= t && t <= 1.f){
 		for (uint8_t ii=0; ii<numt; ++ii){
 			if (std::fabs(samet[ii] - t)<1e-6f)
 				return false;
 		}
+		assert(numt < MAX_POTENTIAL_INTERSECT_POINTS);
 		samet[numt++] = t;
 		return true;
-	};
+	}
+	return false;
+}
+
+// return intersect points number from [0, 2]
+static inline uint8_t
+ray_interset_box(struct math_context * M, const glm::vec4 &o, const glm::vec4& d, math_t boxpoints, glm::vec4 *resultpoints){
+	uint8_t numpoint = 0, numt = 0;
+	float samet[MAX_POTENTIAL_INTERSECT_POINTS] = {0};
+
+	assert(BP_count == math_size(M, boxpoints));
+
 	for (uint8_t iface=0; iface<PN_count; ++iface){
 		const uint8_t ifaceidx = iface*4;
 		for (uint8_t it=0; it<6; it += 3){
@@ -1568,10 +1577,10 @@ ray_interset_box(struct math_context * M, const glm::vec4 &o, const glm::vec4& d
 			const auto& v2 = GETPT(M, boxpoints, v2idx);
 
 			ray_triangle_interset_result r;
-			if (intersect_triangle3(V3R(o), V3R(d), V3R(v0), V3R(v1), V3R(v2), r) && 0.f <= r.t && r.t <= 1.f && check_addt(r.t)){
-				assert(numpoint < MAX_INTERSECT_POINTS);
+			if (intersect_triangle3(V3R(o), V3R(d), V3R(v0), V3R(v1), V3R(v2), r) && check_add_t(r.t, samet, numt)){
+				assert(0 <= numpoint && numpoint < MAX_INTERSECT_POINTS);
 				resultpoints[numpoint++] = o + d * r.t;
-				break;	// break when we found
+				break;
 			}
 		}
 	}
