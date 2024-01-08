@@ -1437,11 +1437,9 @@ read_number(lua_State *L, int index, const char* n, float opt){
 }
 
 static math_t
-create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z, int inf_f) {
+create_proj_mat(lua_State *L, struct math_context *M, int index, struct projection_flags pf) {
 	const float near = read_number(L, index, "n", 0.1f);
 	const float far = read_number(L, index, "f", 100.f);
-
-	int homogeneous_depth = math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH);
 
 	if (lua_getfield(L, index, "fov") == LUA_TNUMBER) {
 		float fov = (float)lua_tonumber(L, -1);
@@ -1450,7 +1448,7 @@ create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z, int 
 		fov *= (float)M_PI / 180.f;
 
 		const float aspect = read_number(L, index, "aspect", 1.f);
-		return math3d_perspectiveLH(M, fov, aspect, near, far, inv_z, inf_f, homogeneous_depth);
+		return math3d_perspectiveLH(M, fov, aspect, near, far, pf);
 	} else {
 		lua_pop(L, 1); //pop "fov"
 
@@ -1464,9 +1462,9 @@ create_proj_mat(lua_State *L, struct math_context *M, int index, int inv_z, int 
 		int ortho = lua_toboolean(L, -1);
 		lua_pop(L, 1);
 		if (ortho) {
-			return math3d_orthoLH(M, left, right, bottom, top, near, far, inv_z, homogeneous_depth); 
+			return math3d_orthoLH(M, left, right, bottom, top, near, far, pf); 
 		}
-		return math3d_frustumLH(M, left, right, bottom, top, near, far, inv_z, inf_f, homogeneous_depth);
+		return math3d_frustumLH(M, left, right, bottom, top, near, far, pf);
 	}
 }
 
@@ -1476,7 +1474,11 @@ lprojmat(lua_State *L) {
 	luaL_checktype(L, 1, LUA_TTABLE);
 	const int inv_z = lua_isnoneornil(L, 2) ? 0 : lua_toboolean(L, 2);
 	const int inf_f = lua_isnoneornil(L, 3) ? 0 : lua_toboolean(L, 3);
-	lua_pushmath(L, create_proj_mat(L, M, 1, inv_z, inf_f));
+	struct projection_flags pf = {
+		math_get_flag(M, FLAG_HOMOGENEOUS_DEPTH),
+		inv_z, inf_f
+	};
+	lua_pushmath(L, create_proj_mat(L, M, 1, pf));
 	return 1;
 }
 
@@ -1999,35 +2001,6 @@ laabb_test_point(lua_State *L) {
 	return 1;
 }
 
-static const char* s_frustum_field[] = {
-	"l", "b", "n", "r", "t", "f",
-};
-
-static int
-laabb_to_frustum(lua_State *L) {
-	struct math_context *M = GETMC(L);
-	math_t aabb_id = aabb_from_index(L, M, 1);
-	const float *aabb = math_value(M, aabb_id);
-
-	lua_createtable(L, 0, 7);
-	lua_pushboolean(L, 1);
-	lua_setfield(L, -2, "ortho");
-
-	const float frustum[6] = {
-		aabb[0], aabb[1], aabb[2],
-		aabb[4], aabb[5], aabb[6],
-	};
-
-	int ii;
-
-	for (ii = 0; ii < sizeof(s_frustum_field)/sizeof(s_frustum_field[0]); ++ii){
-		lua_pushnumber(L, frustum[ii]);
-		lua_setfield(L, -2, s_frustum_field[ii]);
-	}
-
-	return 1;
-}
-
 static int
 laabb_points(lua_State *L){
 	struct math_context *M = GETMC(L);
@@ -2051,45 +2024,6 @@ laabb_expand(lua_State *L){
 	math_t e = vector_from_index(L, M, 2);
 
 	lua_pushmath(L, math3d_aabb_expand(M, aabb, e));
-	return 1;
-}
-
-static int
-lfrustum_to_aabb(lua_State *L){
-	struct math_context *M = GETMC(L);
-	luaL_checktype(L, 1, LUA_TTABLE);
-
-	lua_getfield(L, 1, "ortho");
-	const int isortho = lua_toboolean(L, -1);
-	lua_pop(L, 1);
-
-	if (!isortho) {
-		luaL_error(L, "only support aabb to ortho frustum");
-		return 0;
-	}
-
-	float frustum[6];
-	for (int ii = 0; ii < sizeof(s_frustum_field)/sizeof(s_frustum_field[0]); ++ii){
-		if (LUA_TNUMBER != lua_getfield(L, 1, s_frustum_field[ii])){
-			luaL_error(L, "invalid field:%s in frustum", s_frustum_field[ii]);
-			return 0;
-		}
-		frustum[ii] = (float)lua_tonumber(L, -1);
-		lua_pop(L, 1);
-	}
-	
-	math_t id;
-	float * aabb = alloc_aabb(L, M, &id);
-	aabb[0] = frustum[0],
-	aabb[1] = frustum[1],
-	aabb[2] = frustum[2];
-	aabb[3] = 1.0f;
-	aabb[4] = frustum[3],
-	aabb[5] = frustum[4],
-	aabb[6] = frustum[5];
-	aabb[7] = 1.0f;
-
-	lua_pushmath(L, id);
 	return 1;
 }
 
@@ -2179,18 +2113,6 @@ lfrustum_points(lua_State *L) {
 
 	lua_pushmath(L, result);
 	return 1;
-}
-
-static int
-lfrustum_calc_near_far(lua_State *L){
-	struct math_context *M = GETMC(L);
-	const math_t planes = frustum_planes_from_index(L, M, 1);
-
-	float nearfar[2];
-	math3d_frustum_calc_near_far(M, planes, nearfar);
-	lua_pushnumber(L, nearfar[0]);
-	lua_pushnumber(L, nearfar[1]);
-	return 2;
 }
 
 static int
@@ -2691,7 +2613,6 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "aabb_intersect_plane",laabb_intersect_plane},
 		{ "aabb_intersection",	 laabb_intersection},
 		{ "aabb_test_point",	 laabb_test_point},
-		{ "aabb_to_frustum",	 laabb_to_frustum},
 		{ "aabb_points",		 laabb_points},
 		{ "aabb_planes",		 laabb_planes},
 		{ "aabb_expand",		 laabb_expand},
@@ -2703,8 +2624,6 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "frustum_test_point",		lfrustum_test_point},
 		{ "frustum_aabb_intersect_points",lfrustum_aabb_intersect_points},
 		{ "frustum_points", 		lfrustum_points},
-		{ "frustum_calc_near_far",  lfrustum_calc_near_far},
-		{ "frustum_to_aabb",		lfrustum_to_aabb},
 
 		//primitive
 		{ "point2plane",	lpoint2plane},

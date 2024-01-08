@@ -696,54 +696,147 @@ math3d_lookat_matrix(struct math_context *M, int direction, math_t eye, math_t a
 	return id;
 }
 
-math_t
-math3d_perspectiveLH(struct math_context *M, float fov, float aspect, float near, float far, int inv_z, int inf_f, int homogeneous_depth) {
-  math_t id;
-  if(inv_z){
-	float temp = near; near = far; far = temp;
-  }
-  glm::mat4x4 &mat = allocmat(M, &id);
-  if(inf_f){
-	mat = homogeneous_depth ?
-		perspectiveLH_NO_INFF(fov, aspect, near, far, inv_z) :
-		perspectiveLH_ZO_INFF(fov, aspect, near, far, inv_z);  
-  }else{
-	mat = homogeneous_depth ?
-		glm::perspectiveLH_NO(fov, aspect, near, far) :
-		glm::perspectiveLH_ZO(fov, aspect, near, far);
-  }
-  return id;
-}
+static inline glm::vec2
+perspective_AB(float near, float far, struct projection_flags flags){
+	float A, B;
+	if (flags.infinity_far){
+		if (flags.homogeneous_depth){
+			//(far+near) / (far-near);
+			// flags.invert_z ==> near/-near ==> -1
+			//					  far/far	 ==> 1
+			A = flags.invert_z ? -1.f : 1.f;
+		} else {
+			//far / (far-near);
+			//flags.invert_z ==> far/-near	==> -0	==> -glm::epsilon<float>()
+			//				 ==> far/far	==> 1
+			A = flags.invert_z ? -glm::epsilon<float>() : 1.f;
+		}
 
-math_t
-math3d_frustumLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z, int inf_f, int homogeneous_depth) {
-  math_t id;
-  if(inv_z){
-	float temp = near; near = far; far = temp;
-  }
-  glm::mat4x4 &mat = allocmat(M, &id);
-  if(inf_f){
-	mat = homogeneous_depth ?
-		frustumLH_NO_INFF(left, right, bottom, top, near, far, inv_z) :
-		frustumLH_ZO_INFF(left, right, bottom, top, near, far, inv_z);  
-  }else{
-	mat = homogeneous_depth ?
-		glm::frustumLH_NO(left, right, bottom, top, near, far) :
-		glm::frustumLH_ZO(left, right, bottom, top, near, far);
-  }
-  return id;
-}
+		// -(far*near) / (far-near)
+		//if invert_z ==> -far*near/-near	= far
+		//			  ==> -far*near/far		=-near
+		B = flags.invert_z ? far : -near;
+	} else {
+		const float zrange = far-near;
 
-math_t
-math3d_orthoLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, int inv_z, int homogeneous_depth) {
-	math_t id;
-	if(inv_z){
-		float temp = near; near = far; far = temp;
+		A = (flags.homogeneous_depth ? (far+near) : far) / zrange;
+		B =-(far*near) / zrange;
 	}
+
+	return glm::vec2(A, B);
+}
+
+static inline glm::mat4
+perspectiveLH(float fovy, float aspect, float near, float far, struct projection_flags flags)
+{
+	if (flags.invert_z){
+		std::swap(near, far);
+	}
+
+	assert(abs(aspect - glm::epsilon<float>()) > 0);
+	const float tanHalfFovy = tan(fovy / 2);
+
+	glm::mat4 r(0);
+	r[0][0] = 1 / (aspect * tanHalfFovy);
+	r[1][1] = 1 / (tanHalfFovy);
+	r[2][3] = 1;
+	const glm::vec2 AB = perspective_AB(near, far, flags);
+	r[2][2] = AB[0];
+	r[3][2] = AB[1];
+	return r;
+}
+
+
+static glm::mat4
+frustumLH(float left, float right, float bottom, float top, float near, float far, struct projection_flags flags)
+{
+	if (flags.invert_z){
+		std::swap(near, far);
+	}
+
+	const float xrange = (right - left);
+	const float yrange = (top - bottom);
+	glm::mat4 r(0);
+	r[0][0] = 2.f* near / xrange;
+	r[1][1] = 2.f* near / yrange;
+	r[2][0] = (right + left) / xrange;
+	r[2][1] = (top + bottom) / yrange;
+	r[2][3] = 1.f;
+
+	const glm::vec2 AB = perspective_AB(near, far, flags);
+	r[2][2] = AB[0];
+	r[3][2] = AB[1];
+	return r;
+}
+
+static glm::mat4
+orthoLH(float left, float right, float bottom, float top, float near, float far, struct projection_flags flags)
+{
+	if (flags.invert_z){
+		std::swap(near, far);
+	}
+
+	glm::mat4 r(1);
+	const float xrange = (right - left);
+	const float yrange = (top - bottom);
+	r[0][0] = 2.f / xrange;
+	r[1][1] = 2.f / yrange;
+	r[3][0] =-(right + left)/xrange;
+	r[3][1] =-(top + bottom)/yrange;
+
+	if (flags.infinity_far){
+		//(1.f/(far-near)) | (2.f/(far-near)) ==> c/(far-near)
+		//flags.invert_z ==>	c/-near ==> -0	==>-glm::epsilon<float>()
+		//						c/far	==> 0
+		r[2][2] = flags.invert_z ? -glm::epsilon<float>() : glm::epsilon<float>();
+
+		if (flags.homogeneous_depth){
+			//-(far+near)/(far-near);
+			//flags.invert_z ==>	-near/-near ==> 1
+			//						-far/far	==> -1
+			r[3][2] = flags.invert_z ? 1.f : -1.f;
+		} else {
+			//-near/(far-near);
+			//flags.invert_z ==>	-near/-near ==> 1
+			//						-0/far		==> -0 ==> -glm::epsilon<float>()
+			r[3][2] = flags.invert_z ? 1.f : -glm::epsilon<float>();
+		}
+	} else {
+		const float zrange = (far - near);
+
+		if (flags.homogeneous_depth){
+			r[2][2] = 2.f /zrange;
+			r[3][2] =-(far+near)/zrange;
+		} else {
+			r[2][2] = 1.f /zrange;
+			r[3][2] =-near/zrange;
+		}
+	}
+
+	return r;
+}
+
+math_t
+math3d_perspectiveLH(struct math_context *M, float fov, float aspect, float near, float far, struct projection_flags flags) {
+	math_t id;
 	glm::mat4x4 &mat = allocmat(M, &id);
-	mat = homogeneous_depth ?
-		glm::orthoLH_NO(left, right, bottom, top, near, far) :
-		glm::orthoLH_ZO(left, right, bottom, top, near, far);
+	mat = perspectiveLH(fov, aspect, near, far, flags);
+	return id;
+}
+
+math_t
+math3d_frustumLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, struct projection_flags flags) {
+	math_t id;
+	glm::mat4x4 &mat = allocmat(M, &id);
+	mat = frustumLH(left, right, bottom, top, near, far, flags);
+	return id;
+}
+
+math_t
+math3d_orthoLH(struct math_context *M, float left, float right, float bottom, float top, float near, float far, struct projection_flags flags) {
+	math_t id;
+	glm::mat4x4 &mat = allocmat(M, &id);
+	mat = orthoLH(left, right, bottom, top, near, far, flags);
 	return id;
 }
 
@@ -1423,12 +1516,6 @@ math3d_frustum_points(struct math_context *M, math_t m, int homogeneous_depth) {
 	return math3d_frustum_points_(M, m, homogeneous_depth ? ndc_points_NO : ndc_points_ZO);
 }
 
-void
-math3d_frustum_calc_near_far(struct math_context *M, math_t planes, float result[2]) {
-	// todo
-	result[0] = 0;
-	result[1] = 0;
-}
 
 // plane define:
 //		nx * px + ny*py + nz*pz + d = 0 ==> dot(n, p) + d = 0, where n is normalize vector
