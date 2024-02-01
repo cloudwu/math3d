@@ -34,82 +34,6 @@ static const glm::vec4 NXAXIS = -XAXIS;
 static const glm::vec4 NYAXIS = -YAXIS;
 static const glm::vec4 NZAXIS = -ZAXIS;
 
-static inline glm::mat4x4
-perspectiveLH_NO_INFF(float fovy, float aspect, float zNear, float zFar, int inv_z){
-  assert(abs(aspect - glm::epsilon<float>()) > 0);
-  const float tanHalfFovy = tan(fovy / 2);
-  glm::mat4x4 Result(0);
-  Result[0][0] = 1 / (aspect * tanHalfFovy);
-  Result[1][1] = 1 / (tanHalfFovy);
-  Result[2][3] = 1;
-  if(inv_z){
-    Result[2][2] = -1;
-    Result[3][2] = 2 * zFar;
-  }
-  else{
-    Result[2][2] = 1;
-    Result[3][2] = -2 * zNear;
-  }
-  return Result;
-}
-
-static inline glm::mat4x4
-perspectiveLH_ZO_INFF(float fovy, float aspect, float zNear, float zFar, int inv_z){
-	assert(abs(aspect - glm::epsilon<float>()) > 0);
-	const float tanHalfFovy = tan(fovy / 2);
-	glm::mat4x4 Result(0);
-	Result[0][0] = 1 / (aspect * tanHalfFovy);
-	Result[1][1] = 1 / (tanHalfFovy);
-	Result[2][3] = 1;
-	if(inv_z){
-		Result[2][2] = -glm::epsilon<float>();
-		Result[3][2] = zFar;
-	}
-	else{
-		Result[2][2] = 1;
-		Result[3][2] = -zNear;
-	}
-	return Result;
-}
-
-static inline glm::mat4x4
-frustumLH_NO_INFF(float left, float right, float bottom, float top, float nearVal, float farVal, int inv_z){
-  glm::mat4x4 Result(0);
-  Result[0][0] = 2 * nearVal / (right - left);
-  Result[1][1] = 2 * nearVal / (top - bottom);
-  Result[2][0] = (right + left) / (right - left);
-  Result[2][1] = (top + bottom) / (top - bottom);
-  Result[2][3] = 1;
-  if(inv_z){
-    Result[2][2] = -1;
-    Result[3][2] = 2 * farVal;
-  }
-  else{
-    Result[2][2] = 1;
-    Result[3][2] = -2 * nearVal;
-  }
-  return Result;
-}
-
-static inline glm::mat4x4
-frustumLH_ZO_INFF(float left, float right, float bottom, float top, float nearVal, float farVal, int inv_z){
-	glm::mat4x4 Result(0);
-	Result[0][0] = 2 * nearVal / (right - left);
-	Result[1][1] = 2 * nearVal / (top - bottom);
-	Result[2][0] = (right + left) / (right - left);
-	Result[2][1] = (top + bottom) / (top - bottom);
-	Result[2][3] = 1;
-	if(inv_z){
-		Result[2][2] = -glm::epsilon<float>();
-		Result[3][2] = farVal;
-	}
-	else{
-		Result[2][2] = 1;
-		Result[3][2] = -nearVal;
-	}
-	return Result;
-}
-
 template<typename T>
 inline bool
 is_zero(const T& a, const T& e = T(glm::epsilon<float>())) {
@@ -607,7 +531,7 @@ math3d_inverse_matrix_fast(struct math_context *M, math_t mat) {
 			is_zero(glm::dot(V3R(m[1]), V3R(m[2])), 1e-6f) &&
 			is_zero(glm::dot(V3R(m[2]), V3R(m[0])), 1e-6f));
 
-	// DOT not write: auto m3 = (glm::mat3*)(&m);
+	// DO NOT write: auto m3 = (glm::mat3*)(&m);
 	// transpose 3x3
 	std::swap(r[0][1], r[1][0]);
 	std::swap(r[0][2], r[2][0]);
@@ -671,8 +595,6 @@ math3d_reciprocal(struct math_context *M, math_t v) {
 
 	return id;
 }
-
-#include <cstdio>
 
 math_t
 math3d_lookat_matrix(struct math_context *M, int direction, math_t eye, math_t at, math_t up_id) {
@@ -1140,8 +1062,7 @@ math3d_frusutm_aabb(struct math_context *M, math_t points) {
 
 	const float * points_v = math_value(M, points);
 
-	int ii = 0;
-	for (ii = 0; ii < 8; ++ii){
+	for (int ii = 0; ii < 8; ++ii){
 		const auto &p = VECPTR(points_v + ii * 4);
 		t.minv = glm::min(t.minv, p);
 		t.maxv = glm::max(t.maxv, p);
@@ -1631,9 +1552,9 @@ static constexpr uint8_t MAX_INTERSECT_POINTS = 2;
 //one line intersect with a box, the max points is 6: intersect 2 corners of the box will generate 6 intersect points
 constexpr uint8_t MAX_POTENTIAL_INTERSECT_POINTS = 6;
 static inline bool check_add_t(float t, float *samet, uint8_t &numt) {
-	if (-1.f <= t && t <= 1.f){
+	if (0.f <= t && t <= 1.f){
 		for (uint8_t ii=0; ii<numt; ++ii){
-			if (std::fabs(samet[ii] - t)<1e-6f)
+			if (is_equal(samet[ii], t))
 				return false;
 		}
 		assert(numt < MAX_POTENTIAL_INTERSECT_POINTS);
