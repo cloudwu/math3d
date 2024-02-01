@@ -389,7 +389,7 @@ math_valid(struct math_context *M, math_t id) {
 	} else {
 		if (u.s.frame == 0) {
 			// constant
-			return u.s.index > 0 && u.s.index <= M->constant_n;
+			return u.s.index <= M->constant_n;
 		} else {
 			// marked
 			int page_id = u.s.index / PAGE_SIZE;
