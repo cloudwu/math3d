@@ -20,12 +20,16 @@ do
 	local c3 = math3d.matrix { s = 1 , t = { 0,0,0 } }
 	assert(c == c3)
 
+	assert(math3d.vector() == math3d.constant "v4")
 	assert(math3d.constant("v4", {0,0,0,1}) == math3d.constant "v4")
 	assert(math3d.constant("v4", math3d.vector(0,0,0,1)) == math3d.constant "v4")
 
+	assert(math3d.quaternion() == math3d.constant "quat")
 	assert(math3d.constant("quat", {0,0,0,1}) == math3d.constant "quat")
 	assert(math3d.constant("quat", math3d.quaternion(0,0,0,1)) == math3d.constant "quat")
 
+	assert(math3d.matrix() ==  math3d.constant "mat")
+	assert(math3d.matrix{} ==  math3d.constant "mat")
 	assert(math3d.constant("mat", {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}) == math3d.constant "mat")
 	assert(math3d.constant("mat", math3d.matrix(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1)) == math3d.constant "mat")
 
@@ -197,7 +201,7 @@ do
 
 	print "\tsegment1 interset with triangle:"
 	local s0, s1 = math3d.vector(0, 0, 1, 1), math3d.vector(0, 0, 3, 1)
-	
+
 	print("\tstart point:", math3d.tostring(s0))
 	print("\tend point:", math3d.tostring(s1))
 
@@ -310,7 +314,7 @@ do
 	ref2.v = math3d.add(ref2,ref2,ref2)
 	print(ref2)
 	ref2.v = math3d.mul(ref2, 2.5)
-	
+
 	print("length", ref2, "=", math3d.length(ref2))
 	print("floor", ref2, "=", math3d.tostring(math3d.floor(ref2)))
 	print("dot", ref2, ref2, "=", math3d.dot(ref2, ref2))
@@ -518,7 +522,7 @@ do
 	local isoutside	= assert(math3d.aabb_test_point(aabb, outsidept) < 0)
 	local islayon	= assert(math3d.aabb_test_point(aabb, layonpt) == 0)
 
-	print "aabb test point, aabb:" 
+	print "aabb test point, aabb:"
 	print("\tinside point:",	math3d.tostring(insidept), ", result:", isinside)
 	print("\toutside point:",	math3d.tostring(insidept), ", result:", isoutside)
 	print("\tlayon point:",		math3d.tostring(insidept), ", result:", islayon)
@@ -754,22 +758,22 @@ do
 		local v = math3d.lookto(eyepos, direction, updir)
 		local vp = math3d.mul(p, v)
 		local vinfp = math3d.mul(infp, v)
-	
+
 		local zz_n, ww_n = math3d.index(math3d.transform(vp, math3d.vector(0, 0, n), 1), 3, 4)
 		local zzinf_n, wwinf_n = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, n), 1), 3, 4)
-	
+
 		local zz_m, ww_m = math3d.index(math3d.transform(vp, math3d.vector(0, 0, (n+f)*0.5), 1), 3, 4)
 		local zzinf_m, wwinf_m = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, (n+f)*0.5), 1), 3, 4)
-	
+
 		local zz_f, ww_f = math3d.index(math3d.transform(vp, math3d.vector(0, 0, f), 1), 3, 4)
 		local zzinf_f, wwinf_f = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, f), 1), 3, 4)
-		
+
 		local ndf_n, ndf_n_inf = zz_n / ww_n, zzinf_n / wwinf_n
 		local ndf_m, ndf_m_inf = zz_m / ww_m, zzinf_m / wwinf_m
-		local ndf_f, ndf_f_inf = zz_f / ww_f, zzinf_f / wwinf_f    
+		local ndf_f, ndf_f_inf = zz_f / ww_f, zzinf_f / wwinf_f
 		return ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf
 	end
-	
+
 	local ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.1, 10000)
 	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf= compare_camera(true, 0.1, 20000)
 	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.01, 1000)
