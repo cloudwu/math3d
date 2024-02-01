@@ -387,9 +387,14 @@ math_valid(struct math_context *M, math_t id) {
 	if (u.s.transient) {
 		return frame_alive(M, u.s.frame);
 	} else {
-		if (u.s.frame == 0)
-			return 1;
-		return 1;
+		if (u.s.frame == 0) {
+			// constant
+			return u.s.index > 0 && u.s.index <= M->constant_n;
+		} else {
+			// marked
+			int page_id = u.s.index / PAGE_SIZE;
+			return (page_id < M->marked_page);
+		}
 	}
 }
 
@@ -503,6 +508,21 @@ get_identity(int type) {
 	}
 }
 
+static inline int
+marked_index(struct math_id s) {
+	int index = s.index;
+	if (s.frame > 1) {
+		// indexed array
+		int offset = s.frame - 2;
+		if (offset && s.type == MATH_TYPE_MAT) {
+			offset *= 4;
+		}
+		return index + offset;
+	} else {
+		return index;
+	}
+}
+
 const float *
 math_value(struct math_context *M, math_t id) {
 	union {
@@ -518,17 +538,7 @@ math_value(struct math_context *M, math_t id) {
 		return get_transient(M, u.s.index);
 	} else {
 		if (u.s.frame) {
-			int index = u.s.index;
-			if (u.s.frame > 1) {
-				// indexed array
-				int offset = u.s.frame - 2;
-				if (offset && u.s.type == MATH_TYPE_MAT) {
-					offset *= 4;
-				}
-				return get_marked(M, index + offset);
-			} else {
-				return get_marked(M, index);
-			}
+			return get_marked(M, marked_index(u.s));
 		} else {
 			if (u.s.index == 0) {
 				return get_identity(u.s.type);
