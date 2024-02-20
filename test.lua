@@ -640,7 +640,7 @@ do
 
 	print(math3d.tostring(mat_array))
 
-	local r = math3d.mul_array( { t = { 4,3,2,1 } } ,mat_array)
+	local r = math3d.mul_array( math3d.matrix { t = { 4,3,2,1 } } ,mat_array)
 
 	local tmp = math3d.array_matrix {
 		{},
@@ -650,7 +650,7 @@ do
 --	math3d.assign(outout_ref, math3d.constant "matrix")
 --	print(math3d.tostring(tmp), math3d.tostring(output_ref))
 
-	math3d.mul_array( { s = 42 }, mat_array, output_ref)
+	math3d.mul_array( math3d.matrix { s = 42 }, mat_array, output_ref)
 
 	print(math3d.tostring(tmp))
 end

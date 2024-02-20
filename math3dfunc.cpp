@@ -393,6 +393,16 @@ math3d_mul_matrix(struct math_context *M, math_t v1, math_t v2) {
 
 math_t
 math3d_mul_matrix_array(struct math_context *M, math_t mat, math_t array_mat, math_t output_ref) {
+	int reverse = 0;
+	int sz = math_size(M, array_mat);
+	if (sz == 1) {
+		sz = math_size(M, mat);
+		reverse = 1;
+		math_t tmp = mat;
+		mat = array_mat;
+		array_mat = tmp;
+	}
+
 	if (math_isidentity(mat)) {
 		// mul identity, copy array
 		if (math_isnull(output_ref)) {
@@ -400,7 +410,6 @@ math3d_mul_matrix_array(struct math_context *M, math_t mat, math_t array_mat, ma
 		} else {
 			float * result = math_init(M, output_ref);
 			const float * source = math_value(M, array_mat);
-			int sz = math_size(M, array_mat);
 			int sz_output = math_size(M, output_ref);
 			if (sz_output < sz)
 				sz = sz_output;
@@ -409,7 +418,6 @@ math3d_mul_matrix_array(struct math_context *M, math_t mat, math_t array_mat, ma
 		}
 	}
 
-	int sz = math_size(M, array_mat);
 	if (math_isnull(output_ref)) {
 		output_ref = math_import(M, NULL, MATH_TYPE_MAT, sz);
 	} else {
@@ -419,9 +427,16 @@ math3d_mul_matrix_array(struct math_context *M, math_t mat, math_t array_mat, ma
 	}
 	int i;
 	const glm::mat4x4 &m = MAT(M, mat);
-	for (i=0;i<sz;i++) {
-		glm::mat4x4 &mat = initmat(M, math_index(M, output_ref, i));
-		mat = m * MAT(M, math_index(M, array_mat, i));
+	if (reverse) {
+		for (i=0;i<sz;i++) {
+			glm::mat4x4 &mat = initmat(M, math_index(M, output_ref, i));
+			mat = MAT(M, math_index(M, array_mat, i)) * m;
+		}
+	} else {
+		for (i=0;i<sz;i++) {
+			glm::mat4x4 &mat = initmat(M, math_index(M, output_ref, i));
+			mat = m * MAT(M, math_index(M, array_mat, i));
+		}
 	}
 	return output_ref;
 }

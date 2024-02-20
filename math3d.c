@@ -981,26 +981,6 @@ larray_matrix_ref(lua_State *L) {
 }
 
 static int
-lmul_array(lua_State *L) {
-	struct math_context *M = GETMC(L);
-	math_t m = matrix_from_index(L, M, 1);
-	math_t array = array_from_index(L, M, 2, MATH_TYPE_MAT);
-	math_t output = MATH_NULL;
-	if (!lua_isnoneornil(L, 3)) {
-		output = get_id(L, M, 3);
-		if (!math_isref(M, output)) {
-			return luaL_error(L, "Output is not ref");
-		}
-		int t = math_type(M, output);
-		if (t != MATH_TYPE_MAT)
-			return luaL_error(L, "Output is not matrix, it's %s", math_typename(t));
-	}
-	math_t r = math3d_mul_matrix_array(M, m, array, output);
-	lua_pushmath(L, r);
-	return 1;
-}
-
-static int
 larray_vector(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	lua_pushmath(L, array_from_index(L, M, 1, MATH_TYPE_VEC4));
@@ -2265,6 +2245,32 @@ lmul(lua_State *L) {
 		}
 	}
 	lua_pushmath(L, result);
+	return 1;
+}
+
+static int
+lmul_array(lua_State *L) {
+	struct math_context *M = GETMC(L);
+	math_t lv = get_id(L, M, 1);
+	math_t rv = get_id(L, M, 2);
+	int lt = math_type(M, lv);
+	int rt = math_type(M, rv);
+	if (lt != MATH_TYPE_MAT || rt != MATH_TYPE_MAT) {
+		return luaL_error(L, "Need matrix");
+	}
+
+	math_t output = MATH_NULL;
+	if (!lua_isnoneornil(L, 3)) {
+		output = get_id(L, M, 3);
+		if (!math_isref(M, output)) {
+			return luaL_error(L, "Output is not ref");
+		}
+		int t = math_type(M, output);
+		if (t != MATH_TYPE_MAT)
+			return luaL_error(L, "Output is not matrix, it's %s", math_typename(t));
+	}
+	math_t r = math3d_mul_matrix_array(M, lv, rv, output);
+	lua_pushmath(L, r);
 	return 1;
 }
 
