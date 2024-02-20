@@ -1687,9 +1687,14 @@ math3d_frstum_aabb_intersect_points(struct math_context * M, math_t m, math_t aa
 		// generate line from aabbpoints and frustumpoints
 		const uint8_t s0 = lineindices[il], s1 = lineindices[il+1];
 
-		numpoint += ray_interset_box(M, GETPT(M, aabbpoints, 	s0),GETPT(M, aabbpoints, 	s1), frustumpoints,	points+numpoint);
+		const auto& o0 = GETPT(M, aabbpoints, 	s0);
+		const auto& d0 = GETPT(M, aabbpoints, 	s1) - o0;
+		numpoint += ray_interset_box(M, o0, d0, frustumpoints,points+numpoint);
 		assert(numpoint <= MAXPOINT);
-		numpoint += ray_interset_box(M, GETPT(M, frustumpoints, s0),GETPT(M, frustumpoints, s1), aabbpoints,	points+numpoint);
+
+		const auto& o1 = GETPT(M, frustumpoints, 	s0);
+		const auto& d1 = GETPT(M, frustumpoints, 	s1) - o1;
+		numpoint += ray_interset_box(M, o1, d1, aabbpoints,	points+numpoint);
 		assert(numpoint <= MAXPOINT);
 	}
 	return (numpoint > 0) ? math_import(M, (const float*)(&points), MATH_TYPE_VEC4, numpoint) : MATH_NULL;
