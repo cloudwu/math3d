@@ -655,34 +655,6 @@ do
 	print(math3d.tostring(tmp))
 end
 
-print("SLOT = ", math3d.info "slot")
-print("REF = ", math3d.info "ref")
-ref1 = nil
-ref2 = nil
-ref3 = nil
-collectgarbage "collect"
-print("REF = ", math3d.info "ref")
-print("N = ", math3d.info "transient")
-local m = math3d.marked_matrix { s = 1 , t = { 0,0,0 } }
-print(math3d.tostring(m))
-math3d.unmark(m)
-print("N = ", math3d.info "transient")
-
-do
-	math3d.reset()
-	print("LAST = ", math3d.info "last")
-	for i = 1, 4096 do
-		math3d.matrix {}
-		math3d.vector { 0,0,0}
-	end
-	math3d.reset()
-	print("LAST = ", math3d.info "last")
-
-	print(math3d.tostring(math3d.vector(0,0,0)))
-end
-
-print("SLOT = ", math3d.info "slot")
-
 -- test live
 
 do
@@ -713,9 +685,9 @@ end
 
 print "===ADAPTER==="
 local adapter = require "math3d.adapter" (math3d._COBJECT)
-local testfunc = pcall(require, "math3d.adapter.test")
+local succ, testfunc = pcall(require, "math3d.adapter.test")
 
-if testfunc then
+if succ then
 	local vector 	= adapter.vector(testfunc.vector, 1)	-- convert arguments to vector pointer from 1
 	local matrix1 	= adapter.matrix(testfunc.matrix1, 1, 1)	-- convert 1 mat
 	local matrix2 	= adapter.matrix(testfunc.matrix2, 1, 2)	-- convert 2 mat
@@ -783,3 +755,33 @@ do
 	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.01, 1000, true)
 	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(true, 0.01, 2000, true)
 end
+
+print "===INFO TEST==="
+
+print("SLOT = ", math3d.info "slot")
+print("REF = ", math3d.info "ref")
+ref1 = nil
+ref2 = nil
+ref3 = nil
+collectgarbage "collect"
+print("REF = ", math3d.info "ref")
+print("N = ", math3d.info "transient")
+local m = math3d.marked_matrix { s = 1 , t = { 0,0,0 } }
+print(math3d.tostring(m))
+math3d.unmark(m)
+print("N = ", math3d.info "transient")
+
+do
+	math3d.reset()
+	print("LAST = ", math3d.info "last")
+	for i = 1, 4096 do
+		math3d.matrix {}
+		math3d.vector { 0,0,0}
+	end
+	math3d.reset()
+	print("LAST = ", math3d.info "last")
+
+	print(math3d.tostring(math3d.vector(0,0,0)))
+end
+
+print("SLOT = ", math3d.info "slot")
