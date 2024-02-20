@@ -653,11 +653,20 @@ do
 	math3d.mul_array( math3d.matrix { s = 42 }, mat_array, output_ref)
 
 	print(math3d.tostring(tmp))
+
+	math3d.mul_array( mat_array, mat_array, output_ref)
+
+	for i = 1, 2 do
+		local m = math3d.array_index(mat_array, i)
+		assert(math3d.tostring(math3d.mul(m, m)) == math3d.tostring(math3d.array_index(tmp, i)))
+	end
 end
 
 -- test live
 
 do
+
+	print "===ALIVE==="
 	local v = math3d.vector(1,2,3,4)
 
 	math3d.reset()

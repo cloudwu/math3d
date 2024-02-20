@@ -391,6 +391,14 @@ math3d_mul_matrix(struct math_context *M, math_t v1, math_t v2) {
 	return id;
 }
 
+static inline void
+matrix_mul(float * output, const float *m1, const float *m2) {
+	glm::mat4x4 & omat = *(glm::mat4x4 *)(output);
+	const glm::mat4x4 & mat1 = *(const glm::mat4x4 *)(m1);
+	const glm::mat4x4 & mat2 = *(const glm::mat4x4 *)(m2);
+	omat = mat1 * mat2;
+}
+
 math_t
 math3d_mul_matrix_array(struct math_context *M, math_t mat, math_t array_mat, math_t output_ref) {
 	int reverse = 0;
@@ -401,7 +409,31 @@ math3d_mul_matrix_array(struct math_context *M, math_t mat, math_t array_mat, ma
 		math_t tmp = mat;
 		mat = array_mat;
 		array_mat = tmp;
+	} else {
+		int matsz = math_size(M, mat);
+		if (matsz > 1) {
+			// array(mat) * array(array_mat)
+			if (matsz < sz)
+				sz = matsz;
+			if (math_isnull(output_ref)) {
+				output_ref = math_import(M, NULL, MATH_TYPE_MAT, sz);
+			} else {
+				int output_sz = math_size(M, output_ref);
+				if (output_sz < sz)
+					sz = output_sz;
+			}
+			int i;
+			const float * lm = math_value(M, mat);
+			const float * rm = math_value(M, array_mat);
+			float * out_buf = math_init(M, output_ref);
+			for (i=0;i<sz;i++) {
+				matrix_mul(out_buf + i * 16, lm + i * 16, rm + i * 16);
+			}
+			return output_ref;
+		}
 	}
+
+	// matrix * array
 
 	if (math_isidentity(mat)) {
 		// mul identity, copy array
@@ -426,16 +458,16 @@ math3d_mul_matrix_array(struct math_context *M, math_t mat, math_t array_mat, ma
 			sz = output_sz;
 	}
 	int i;
-	const glm::mat4x4 &m = MAT(M, mat);
+	const float * m = math_value(M, mat);
+	float * out_buf = math_init(M, output_ref);
+	const float * in_buf = math_value(M, array_mat);
 	if (reverse) {
 		for (i=0;i<sz;i++) {
-			glm::mat4x4 &mat = initmat(M, math_index(M, output_ref, i));
-			mat = MAT(M, math_index(M, array_mat, i)) * m;
+			matrix_mul(out_buf + i * 16, m, in_buf + i * 16);
 		}
 	} else {
 		for (i=0;i<sz;i++) {
-			glm::mat4x4 &mat = initmat(M, math_index(M, output_ref, i));
-			mat = m * MAT(M, math_index(M, array_mat, i));
+			matrix_mul(out_buf + i * 16, in_buf + i * 16, m);
 		}
 	}
 	return output_ref;
