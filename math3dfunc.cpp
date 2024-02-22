@@ -463,11 +463,11 @@ math3d_mul_matrix_array(struct math_context *M, math_t mat, math_t array_mat, ma
 	const float * in_buf = math_value(M, array_mat);
 	if (reverse) {
 		for (i=0;i<sz;i++) {
-			matrix_mul(out_buf + i * 16, m, in_buf + i * 16);
+			matrix_mul(out_buf + i * 16, in_buf + i * 16, m);
 		}
 	} else {
 		for (i=0;i<sz;i++) {
-			matrix_mul(out_buf + i * 16, in_buf + i * 16, m);
+			matrix_mul(out_buf + i * 16, m, in_buf + i * 16);
 		}
 	}
 	return output_ref;
