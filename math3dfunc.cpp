@@ -1441,7 +1441,7 @@ math3d_frustum_intersect_aabb(struct math_context *M, math_t planes, math_t aabb
 
 struct frustum_corners {
 	glm::vec4 c[BP_count];
-	static constexpr frustum_corners corners(float n, float f) {
+	static frustum_corners corners(float n, float f) {
 		return frustum_corners {
 			.c = {
 				glm::vec4(-1.f,-1.f, n, 1.f),
