@@ -1,5 +1,4 @@
 #define LUA_LIB
-#define GLM_ENABLE_EXPERIMENTAL
 
 #include <cmath>
 #include <cassert>
