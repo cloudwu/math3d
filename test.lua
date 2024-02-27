@@ -643,10 +643,13 @@ do
 	local r = math3d.mul_array( math3d.matrix { t = { 4,3,2,1 } } ,mat_array)
 
 	local tmp = math3d.array_matrix {
-		{},
-		{},
+		{ s = 1},
+		{ s = 2},
 	}
 	local output_ref = math3d.array_matrix_ref(math3d.value_ptr(tmp), 2)
+	print("ARRAY", math3d.tostring(output_ref))
+	print("ARRAY[1]", math3d.tostring(math3d.array_index(output_ref,1)))
+	print("ARRAY[2]", math3d.tostring(math3d.array_index(output_ref,2)))
 --	math3d.assign(outout_ref, math3d.constant "matrix")
 --	print(math3d.tostring(tmp), math3d.tostring(output_ref))
 

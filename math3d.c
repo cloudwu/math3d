@@ -549,16 +549,24 @@ id_tostring(lua_State *L, math_t id) {
 	const float * v = math_value(M, id);
 	int type = math_type(M, id);
 	int size = math_size(M, id);
+	char t = 't';
+	if (math_marked(M, id)) {
+		t = 'm';
+	} else if (math_isconstant(id)) {
+		t = 'c';
+	} else if (math_isref(M, id)) {
+		t = 'r';
+	}
 	switch (type) {
 	case MATH_TYPE_MAT:
 		if (size == 1) {
-			lua_pushfstring(L, "MAT (%f,%f,%f,%f : %f,%f,%f,%f : %f,%f,%f,%f : %f,%f,%f,%f)",
+			lua_pushfstring(L, "%cMAT (%f,%f,%f,%f : %f,%f,%f,%f : %f,%f,%f,%f : %f,%f,%f,%f)", t,
 				v[0],v[1],v[2],v[3],
 				v[4],v[5],v[6],v[7],
 				v[8],v[9],v[10],v[11],
 				v[12],v[13],v[14],v[15]);
 		} else {
-			lua_pushfstring(L, "MAT[%d]", size);
+			lua_pushfstring(L, "%cMAT[%d]", t, size);
 			int i;
 			for (i=0;i<size;i++) {
 				lua_pushfstring(L, " (%f,%f,%f,%f : %f,%f,%f,%f : %f,%f,%f,%f : %f,%f,%f,%f)",
@@ -573,10 +581,10 @@ id_tostring(lua_State *L, math_t id) {
 		break;
 	case MATH_TYPE_VEC4:
 		if (size == 1) {
-			lua_pushfstring(L, "VEC4 (%f,%f,%f,%f)",
+			lua_pushfstring(L, "%cVEC4 (%f,%f,%f,%f)", t,
 				v[0], v[1], v[2], v[3]);
 		} else {
-			lua_pushfstring(L, "VEC4[%d]", size);
+			lua_pushfstring(L, "%cVEC4[%d]", t, size);
 			int i;
 			for (i=0;i<size;i++) {
 				lua_pushfstring(L, " (%f,%f,%f,%f)",
@@ -588,10 +596,10 @@ id_tostring(lua_State *L, math_t id) {
 		break;
 	case MATH_TYPE_QUAT:
 		if (size == 1) {
-			lua_pushfstring(L, "QUAT (%f,%f,%f,%f)",
+			lua_pushfstring(L, "%cQUAT (%f,%f,%f,%f)", t,
 				v[0], v[1], v[2], v[3]);
 		} else {
-			lua_pushfstring(L, "QUAT[%d]", size);
+			lua_pushfstring(L, "%cQUAT[%d]", t, size);
 			int i;
 			for (i=0;i<size;i++) {
 				lua_pushfstring(L, " (%f,%f,%f,%f)",

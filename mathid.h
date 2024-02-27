@@ -90,9 +90,9 @@ math_quat(struct math_context *ctx, const float *v) {
 struct math_id {
 	uint32_t frame		: 20;
 	uint32_t size		: 12;	// array size - 1 (0 : single object), for ref type, it's index
-	uint32_t index      : 28;
-	uint32_t type       : 3;
-	uint32_t transient  : 1;	// 0: persisent
+	uint32_t index		: 28;
+	uint32_t type		: 3;
+	uint32_t transient	: 1;	// 0: persisent
 };
 
 static inline math_t
@@ -160,7 +160,9 @@ math_size(struct math_context *ctx, math_t id) {
 	u.id = id;
 	if (u.s.type != MATH_TYPE_REF)
 		return u.s.size + 1;
-	return math_ref_size_(ctx, u.s);
+	else {
+		return math_ref_size_(ctx, u.s);
+	}
 }
 
 #endif

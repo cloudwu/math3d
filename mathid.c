@@ -362,6 +362,8 @@ get_reference(struct math_context *M, int index, int offset) {
 
 int
 math_ref_size_(struct math_context *M, struct math_id id) {
+	if (id.size > 0)
+		return 1;
 	struct math_ref * r = (struct math_ref *)get_transient(M, id.index);
 	return r->size;
 }
@@ -472,7 +474,8 @@ math_index(struct math_context *M, math_t id, int index) {
 	int size = math_size(M, id);
 	assert(index < size);
 	if (u.s.type == MATH_TYPE_REF) {
-		u.s.size = index;
+		assert(u.s.size == 0);
+		u.s.size = index + 1;
 		return u.id;
 	} else if (!u.s.transient && u.s.frame > 0) {
 		// marked
@@ -533,7 +536,10 @@ math_value(struct math_context *M, math_t id) {
 	if (u.s.transient) {
 		assert(frame_alive(M, u.s.frame));
 		if (u.s.type == MATH_TYPE_REF) {
-			return get_reference(M, u.s.index, u.s.size);
+			int index = u.s.size;
+			if (index == 0)
+				index = 1;
+			return get_reference(M, u.s.index, index - 1);
 		}
 		return get_transient(M, u.s.index);
 	} else {
