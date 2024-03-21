@@ -581,7 +581,7 @@ new_marked_page(struct math_context *M) {
 	M->p[page].marked = (struct page *)malloc(sizeof(struct page));
 	assert(M->p[page].count == NULL);
 	M->p[page].count = (struct marked_count *)malloc(sizeof(struct marked_count));
-	memset(M->p[page].count, 0, sizeof(struct marked_count));
+	memset(M->p[page].count, INVALID_MARK_COUNT, sizeof(struct marked_count));
 
 	struct marked_freelist *node = (struct marked_freelist *)M->p[page].marked;
 	node->next = NULL;

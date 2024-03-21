@@ -2516,18 +2516,18 @@ lmarked_list(lua_State *L) {
 		if (filename == NULL) {
 			filename = "UNKNOWN";
 		}
-		lua_pushfstring(L, "%s:%d (%d)", filename, iter.line, iter.count);
+		lua_pushfstring(L, "%s:%d", filename, iter.line);
 		lua_pushvalue(L, -1);
 		// table source source
 		if (lua_rawget(L, -3) == LUA_TNIL) {
 			// table source nil
 			lua_pop(L, 1);
-			lua_pushinteger(L, 1);
+			lua_pushinteger(L, iter.count);
 			// table source 1
 		} else {
 			int n = (int)lua_tointeger(L, -1);
 			lua_pop(L, 1);
-			lua_pushinteger(L, n + 1);
+			lua_pushinteger(L, n + iter.count);
 		}
 		lua_rawset(L, -3);
 	}
