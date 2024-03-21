@@ -27,6 +27,41 @@ struct refobject {
 #define FLAG_HOMOGENEOUS_DEPTH 0
 #define FLAG_ORIGIN_BOTTOM_LEFT 1
 
+#ifdef MATHIDSOURCE
+static math_t
+lua_math_mark_(lua_State *L, struct math_context *M, math_t id, const char *filename, int line) {
+	lua_Debug ar;
+	if (lua_getstack(L, 1, &ar)) {
+		lua_getinfo(L, "Sl", &ar);
+		if (ar.short_src && ar.currentline > 0) {
+			if (lua_getfield(L, LUA_REGISTRYINDEX, "MATH3D_FILENAME") != LUA_TTABLE) {
+				lua_pop(L, 1);
+				lua_newtable(L);
+				lua_pushvalue(L, -1);
+				lua_setfield(L, LUA_REGISTRYINDEX, "MATH3D_FILENAME");
+			}
+			const char *src = lua_pushstring(L, ar.short_src);
+			lua_pushvalue(L, -1);
+			if (LUA_TNIL == lua_rawget(L, -3)) {
+				lua_pop(L, 1);
+				lua_pushvalue(L, -1);
+				lua_rawset(L, -3);
+			}
+			else {
+				src = lua_tostring(L, -1);
+				lua_pop(L, 2);
+			}
+			lua_pop(L, 1);
+			return math_mark_(M, id, src, ar.currentline);
+		}
+	}
+	return math_mark_(M, id, filename, line);
+}
+#define lua_math_mark(L, M, id) lua_math_mark_(L, M, id, __FILE__, __LINE__)
+#else
+#define lua_math_mark(L, M, id) math_mark_(M, id, __FILE__, __LINE__)
+#endif
+
 static size_t
 getlen(lua_State *L, int index) {
 	lua_len(L, index);
@@ -143,7 +178,7 @@ lref(lua_State *L) {
 		R->id = MATH_NULL;
 	} else {
 		math_t id = get_id(L, M, 1);
-		R->id = math_mark(M, id);
+		R->id = lua_math_mark(L, M, id);
 	}
 	lua_pushvalue(L, lua_upvalueindex(2));
 	lua_setmetatable(L, -2);
@@ -154,7 +189,7 @@ static int
 lmark(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	math_t id = get_id(L, M, 1);
-	id = math_mark(M, id);
+	id = lua_math_mark(L, M, id);
 	lua_pushmath(L, id);
 	return 1;
 }
@@ -198,7 +233,7 @@ assign_id(lua_State *L, struct math_context *M, int index, int mtype, int ltype)
 				luaL_error(L, "%s type mismatch %s", math_typename(mtype), math_typename(type));
 			}
 		}
-		return math_mark(M, id); }
+		return lua_math_mark(L, M, id); }
 	default:
 		luaL_error(L, "Invalid type %s for %s ref", lua_typename(L, ltype), math_typename(mtype));
 		break;
@@ -358,7 +393,7 @@ assign_object(lua_State *L, struct math_context *M, int index, int mtype, from_t
 	int ltype = lua_type(L, index);
 	if (ltype == LUA_TTABLE) {
 		math_t id = from_table(L, M, index);
-		return math_mark(M, id);
+		return lua_math_mark(L, M, id);
 	}
 	return assign_id(L, M, index, mtype, ltype);
 }
@@ -409,7 +444,7 @@ ref_set_number(lua_State *L){
 	struct math_context *M = GETMC(L);
 	math_t oid = R->id;
 
-	R->id = math_mark(M, set_index_object(L, M, oid));
+	R->id = lua_math_mark(L, M, set_index_object(L, M, oid));
 	unmark_check(M, oid);
 
 	return 0;
@@ -934,7 +969,7 @@ static inline int
 marked_ctor(lua_State *L, math_lfunc f) {
 	struct math_context *M = GETMC(L);
 	int cp = math_checkpoint(M);
-	math_t id = math_mark(M, f(L));
+	math_t id = lua_math_mark(L, M, f(L));
 	lua_pushmath(L, id);
 	math_recover(M, cp);
 	return 1;
