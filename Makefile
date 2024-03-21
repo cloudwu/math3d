@@ -17,7 +17,7 @@ $(ODIR)/math3d.o : math3d.c | $(ODIR)
 	$(CC) -c $(CFLAGS) -o $@ $^ $(LUAINC)
 
 $(ODIR)/math3dfunc.o : math3dfunc.cpp | $(ODIR)
-	$(CXX) -c $(CFLAGS) -Wno-char-subscripts -o -DGLM_ENABLE_EXPERIMENTAL -DGLM_FORCE_QUAT_DATA_XYZW $@ $^ $(GLM_INC)
+	$(CXX) -c $(CFLAGS) -Wno-char-subscripts -o $@ -DGLM_ENABLE_EXPERIMENTAL -DGLM_FORCE_QUAT_DATA_XYZW $^ $(GLM_INC)
 
 $(ODIR)/mathadapter.o : mathadapter.c | $(ODIR)
 	$(CC) -c $(CFLAGS) -o $@ $^ $(LUAINC)
