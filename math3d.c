@@ -28,12 +28,15 @@ struct refobject {
 #define FLAG_ORIGIN_BOTTOM_LEFT 1
 
 #ifdef MATHIDSOURCE
+
+typedef math_t (*mark_func)(struct math_context *, math_t id, const char *filename, int line);
+
 static math_t
-lua_math_mark_(lua_State *L, struct math_context *M, math_t id, const char *filename, int line) {
+lua_math_mark_(lua_State *L, mark_func mark, struct math_context *M, math_t id, const char *filename, int line) {
 	lua_Debug ar;
 	if (lua_getstack(L, 1, &ar)) {
 		lua_getinfo(L, "Sl", &ar);
-		if (ar.short_src && ar.currentline > 0) {
+		if (ar.short_src[0] && ar.currentline > 0) {
 			if (lua_getfield(L, LUA_REGISTRYINDEX, "MATH3D_FILENAME") != LUA_TTABLE) {
 				lua_pop(L, 1);
 				lua_newtable(L);
@@ -52,14 +55,16 @@ lua_math_mark_(lua_State *L, struct math_context *M, math_t id, const char *file
 				lua_pop(L, 2);
 			}
 			lua_pop(L, 1);
-			return math_mark_(M, id, src, ar.currentline);
+			return mark(M, id, src, ar.currentline);
 		}
 	}
-	return math_mark_(M, id, filename, line);
+	return mark(M, id, filename, line);
 }
-#define lua_math_mark(L, M, id) lua_math_mark_(L, M, id, __FILE__, __LINE__)
+#define lua_math_mark(L, M, id) lua_math_mark_(L, math_mark_, M, id, __FILE__, __LINE__)
+#define lua_math_clone(L, M, id) lua_math_mark_(L, math_clone_, M, id, __FILE__, __LINE__)
 #else
 #define lua_math_mark(L, M, id) math_mark_(M, id, __FILE__, __LINE__)
+#define lua_math_clone(L, M, id) math_clone_(M, id, __FILE__, __LINE__)
 #endif
 
 static size_t
@@ -190,6 +195,15 @@ lmark(lua_State *L) {
 	struct math_context *M = GETMC(L);
 	math_t id = get_id(L, M, 1);
 	id = lua_math_mark(L, M, id);
+	lua_pushmath(L, id);
+	return 1;
+}
+
+static int
+lmark_clone(lua_State *L) {
+	struct math_context *M = GETMC(L);
+	math_t id = get_id(L, M, 1);
+	id = lua_math_clone(L, M, id);
 	lua_pushmath(L, id);
 	return 1;
 }
@@ -2576,6 +2590,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		{ "ref", NULL },
 		{ "mark", lmark },
 		{ "unmark", lunmark },
+		{ "mark_clone", lmark_clone },
 		{ "constant", lconstant },
 		{ "constant_array", lconstant_array },
 		{ "tostring", ltostring },

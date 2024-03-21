@@ -795,6 +795,18 @@ math_mark_(struct math_context *M, math_t id, const char *filename, int line) {
 	return get_marked_id(M, id, filename, line);
 }
 
+math_t
+math_clone_(struct math_context *M, math_t id, const char *filename, int line) {
+	if (math_isconstant(id))
+		return id;
+
+	const float *v = math_value(M, id);
+	int size = math_size(M, id);
+	int type = math_type(M, id);
+	M->marked_n++;
+	return alloc_marked(M, v, type, size, filename, line);
+}
+
 static inline int64_t
 math_unmark_handle_(struct math_id id) {
 	int size  = id.size + 1;

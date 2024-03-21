@@ -41,6 +41,8 @@ math_t math_ref(struct math_context *, const float *v, int type, int size);
 math_t math_premark(struct math_context *, int type, int size);
 math_t math_mark_(struct math_context *, math_t id, const char *filename, int line);
 #define math_mark(M, id) math_mark_(M, id, __FILE__, __LINE__)
+math_t math_clone_(struct math_context *, math_t id, const char *filename, int line);
+#define math_clone(M, id) math_clone_(M, id, __FILE__, __LINE__)
 
 struct math_marked_iter {
 	int iter;
