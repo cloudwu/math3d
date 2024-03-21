@@ -867,7 +867,8 @@ math_unmark(struct math_context *M, math_t id) {
 	assert(vecsize + index <= PAGE_SIZE);
 	uint8_t * count = &M->p[page_id].count->count[index];
 	int c = *count;
-	assert(c != INVALID_MARK_COUNT);
+	if (c == INVALID_MARK_COUNT)
+		return -1;
 	if (c == 1) {
 		// The last reference
 		math_unmarked_insert(&M->unmarked, u.s);
