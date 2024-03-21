@@ -2516,7 +2516,7 @@ lmarked_list(lua_State *L) {
 		if (filename == NULL) {
 			filename = "UNKNOWN";
 		}
-		lua_pushfstring(L, "%s:%d", filename, iter.line);
+		lua_pushfstring(L, "%s:%d (%d)", filename, iter.line, iter.count);
 		lua_pushvalue(L, -1);
 		// table source source
 		if (lua_rawget(L, -3) == LUA_TNIL) {

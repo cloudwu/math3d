@@ -428,8 +428,10 @@ math_marked_next(struct math_context *M, struct math_marked_iter *iter) {
 		if (page_id >= M->marked_page)
 			return 0;
 		int page_index = index % PAGE_SIZE;
-		if (M->p[page_id].count->count[page_index] > 0) {
+		int count = M->p[page_id].count->count[page_index];
+		if (count != INVALID_MARK_COUNT) {
 			iter->iter = index+1;
+			iter->count = count;
 			iter->filename = M->p[page_id].count->filename[page_index];
 			iter->line = M->p[page_id].count->line[page_index];
 			return 1;

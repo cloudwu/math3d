@@ -44,6 +44,7 @@ math_t math_mark_(struct math_context *, math_t id, const char *filename, int li
 
 struct math_marked_iter {
 	int iter;
+	int count;
 	const char *filename;
 	int line;
 };
