@@ -2372,7 +2372,7 @@ lplane(lua_State *L){
 	tmp[0] = normal[0];
 	tmp[1] = normal[1];
 	tmp[2] = normal[2];
-	tmp[3] = math3d_dot(M, point, normal_id);
+	tmp[3] = -math3d_dot(M, point, normal_id);
 
 	lua_pushmath(L, r);
 
