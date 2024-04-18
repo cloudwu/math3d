@@ -328,9 +328,9 @@ object_from_field(lua_State *L, struct math_context *M, int index, const char *k
 }
 
 static math_t
-quat_from_axis(lua_State *L, struct math_context *M, int index, const char *key) {
-	if (lua_getfield(L, index, key) == LUA_TNIL) {
-		luaL_error(L, "Quat invalid arguments");
+quat_from_axis(lua_State *L, struct math_context *M, int index) {
+	if (lua_getfield(L, index, "axis") == LUA_TNIL) {
+		luaL_error(L, "Need .axis for quat");
 	}
 
 	math_t axis = object_from_index(L, M, -1, MATH_TYPE_VEC4, vector_from_table);
@@ -349,7 +349,7 @@ static math_t
 quat_from_table(lua_State *L, struct math_context *M, int index) {
 	size_t n = getlen(L, index);
 	if (n == 0) {
-		return quat_from_axis(L, M, index, "axis");
+		return quat_from_axis(L, M, index);
 	} else if (n == 3) {
 		math_t tmp = math_vec4(M, NULL);
 		float *e = math_init(M, tmp);
