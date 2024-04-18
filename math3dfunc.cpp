@@ -62,12 +62,12 @@ allocmat(struct math_context *M, math_t *id) {
 	return *(glm::mat4x4 *)buf;
 }
 
-static inline glm::mat4x4 &
-initmat(struct math_context *M, math_t id) {
-	check_type(M, id, MATH_TYPE_MAT);
-	float * buf = math_init(M, id);
-	return *(glm::mat4x4 *)buf;
-}
+// static inline glm::mat4x4 &
+// initmat(struct math_context *M, math_t id) {
+// 	check_type(M, id, MATH_TYPE_MAT);
+// 	float * buf = math_init(M, id);
+// 	return *(glm::mat4x4 *)buf;
+// }
 
 static inline glm::quat &
 allocquat(struct math_context *M, math_t *id) {
@@ -1667,37 +1667,47 @@ math3d_frustum_test_point(struct math_context * M, math_t planes, math_t p){
 	return where;
 }
 
+static inline uint8_t
+find_points_in_aabb(struct math_context* M, math_t testpoints, math_t aabb, glm::vec4 *points){
+	uint8_t n = 0;
+	for (uint8_t ii=0; ii<BP_count;++ii){
+		math_t p = math_index(M, testpoints, ii);
+		if (math3d_aabb_test_point(M, aabb, p) >= 0){
+			points[n++] = VEC(M, p);
+		}
+	}
+	return n;
+}
+
+static inline uint8_t
+find_points_in_frustum(struct math_context *M, math_t testpoints, math_t frustumplanes, glm::vec4 *points){
+	uint8_t n = 0;
+	for (uint8_t ii=0; ii<BP_count;++ii){
+		math_t p = math_index(M, testpoints, ii);
+		if (math3d_frustum_test_point(M, frustumplanes, p) >= 0){
+			points[n++] = VEC(M, p);
+		}
+	}
+	return n;
+}
+
 math_t
 math3d_frstum_aabb_intersect_points(struct math_context * M, math_t m, math_t aabb, int HOMOGENEOUS_DEPTH){
-	int numpoint = 0;
-
 	constexpr int MAXPOINT = 64;
 	glm::vec4 points[MAXPOINT];
 
 	const math_t frustumpoints	= math3d_frustum_points(M, m, HOMOGENEOUS_DEPTH);
 
-	auto test_points_in_box = [M, &numpoint, &points](math_t testpoints, auto checkop){
-		uint8_t n = 0;
-		for (uint8_t ii=0; ii<BP_count;++ii){
-			math_t p = math_index(M, testpoints, ii);
-			if (checkop(p)){
-				points[n++] = VEC(M, p);
-			}
-		}
-
-		numpoint += n;
-		return n;
-	};
-
-	if (8 == test_points_in_box(frustumpoints, [M, aabb](math_t p){ return math3d_aabb_test_point(M, aabb, p) >= 0; })){
+	uint8_t numpoint = find_points_in_aabb(M, frustumpoints, aabb, points);
+	if (8 == numpoint){
 		return math_import(M, (const float*)(&points), MATH_TYPE_VEC4, numpoint);
 	}
 
 	const math_t aabbpoints		= math3d_aabb_points(M, aabb);
 	const math_t frustumplanes	= math3d_frustum_planes(M, m, HOMOGENEOUS_DEPTH);
-
-	if (8 == test_points_in_box(aabbpoints, [M, frustumplanes](math_t p){ return math3d_frustum_test_point(M, frustumplanes, p) >= 0; })){
-		assert(numpoint == 8);
+	const uint8_t ptinfrustum = find_points_in_frustum(M, aabbpoints, frustumplanes, points+numpoint);
+	numpoint += ptinfrustum;
+	if (8 == ptinfrustum){
 		return math_import(M, (const float*)(&points), MATH_TYPE_VEC4, numpoint);
 	}
 
