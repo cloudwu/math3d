@@ -14,8 +14,10 @@ local box_line_indices<const> = {
 	4, 5, 6, 7,
 }
 
+local CORNER<const> = tu.corner_indices
+local PLANE<const> = tu.plane_indiecs
 do
-	local aabb = math3d.minmax(math3d.array_vector(math3d.vector(0, 4, 2), math3d.vector(2, 2, 4)))
+	local aabb = math3d.minmax{math3d.vector(0, 4, 2), math3d.vector(2, 2, 4)}
 	assert(math3d.array_size(aabb) == 2)
 	local check_minv, check_maxv = math3d.vector(0, 2, 2), math3d.vector(2, 4, 4)
 	tu.check_aabb(aabb, check_minv, check_maxv)
@@ -42,21 +44,22 @@ do
 		local hfov60<const>				= aspect * fov60 --width/height = hfov/fov ==> aspect * fov = hfov
 		local hfov60radian<const>		= math.rad(hfov60)
 		local half_hfov60radian<const>	= hfov60radian * 0.5
-		local projmat = math3d.projmat{aspect=aspect, fov=fov60, n=near, f=near}
+		local projmat = math3d.projmat{aspect=aspect, fov=fov60, n=near, f=far}
 
 		local test_plane_normals<const> = {
-			left 	= math3d.transform(math3d.quaternion{axis=math3d.vector(0.0, 1.0, 0.0), r=-half_hfov60radian}, math3d.vector(0.0, 0.0, 1.0, 0.0), 0),
-			right 	= math3d.transform(math3d.quaternion{axis=math3d.vector(0.0, 1.0, 0.0), r= half_hfov60radian}, math3d.vector(0.0, 0.0, 1.0, 0.0), 0),
-			top 	= math3d.transform(math3d.quaternion{axis=math3d.vector(1.0, 0.0, 0.0), r=-half_fov60radian},  math3d.vector(0.0, 0.0, 1.0, 0.0), 0),
-			bottom 	= math3d.transform(math3d.quaternion{axis=math3d.vector(1.0, 0.0, 0.0), r= half_fov60radian},  math3d.vector(0.0, 0.0, 1.0, 0.0), 0),
-			near	= math3d.vector(0.0, 0.0, 1.0, 0.0),
-			far		= math3d.vector(0.0, 0.0,-1.0, 0.0),
+			[PLANE.left] 	= math3d.transform(math3d.quaternion{axis=math3d.vector(0.0, 1.0, 0.0), r=-half_hfov60radian}, math3d.vector( 1.0, 0.0, 0.0, 0.0), 0),
+			[PLANE.right] 	= math3d.transform(math3d.quaternion{axis=math3d.vector(0.0, 1.0, 0.0), r= half_hfov60radian}, math3d.vector(-1.0, 0.0, 0.0, 0.0), 0),
+			[PLANE.bottom]	= math3d.transform(math3d.quaternion{axis=math3d.vector(1.0, 0.0, 0.0), r= half_fov60radian},  math3d.vector( 0.0, 1.0, 0.0, 0.0), 0),
+			[PLANE.top]		= math3d.transform(math3d.quaternion{axis=math3d.vector(1.0, 0.0, 0.0), r=-half_fov60radian},  math3d.vector( 0.0,-1.0, 0.0, 0.0), 0),
+			[PLANE.near]	= math3d.vector(0.0, 0.0, 1.0, 0.0),
+			[PLANE.far]		= math3d.vector(0.0, 0.0,-1.0, 0.0),
 		}
 
 		--check planes
 		local frustum_planes = math3d.frustum_planes(projmat)
 		print(tu.tabs(2) .. "frustum planes:")
 		tu.print_box_planes(frustum_planes, TWO_TAB)
+
 		assert(#test_plane_normals == math3d.array_size(frustum_planes))
 		for i=1, #test_plane_normals do
 			local p1 = math3d.normalize(test_plane_normals[i])
@@ -66,34 +69,32 @@ do
 
 		--check points
 		--near half width
-		local cosv = math.cos(half_hfov60radian)
-		local nhw<const> = near/cosv
-		local nhh<const> = nhw / aspect
+		local tanv = math.tan(half_hfov60radian)
+		local nhw<const> = near*tanv
+		local nhh<const> = nhw/aspect
 
 		--far half width
-		local fhw<const> = far/cosv
+		local fhw<const> = far*tanv
 		local fhh<const> = fhw/aspect
 		local testpoints<const> = {
-			lbn = math3d.vector(-nhw, -nhh, near),
-			ltn = math3d.vector(-nhw,  nhh, near),
-			rbn = math3d.vector( nhw, -nhh, near),
-			rtn = math3d.vector( nhw,  nhh, near),
+			[CORNER.lbn] = math3d.vector(-nhw, -nhh, near),
+			[CORNER.ltn] = math3d.vector(-nhw,  nhh, near),
+			[CORNER.rbn] = math3d.vector( nhw, -nhh, near),
+			[CORNER.rtn] = math3d.vector( nhw,  nhh, near),
 
-			lbf = math3d.vector(-fhw, -fhh, far),
-			ltf = math3d.vector(-fhw,  fhh, far),
-			rbf = math3d.vector( fhw, -fhh, far),
-			rtf = math3d.vector( fhw,  fhh, far),
+			[CORNER.lbf] = math3d.vector(-fhw, -fhh, far),
+			[CORNER.ltf] = math3d.vector(-fhw,  fhh, far),
+			[CORNER.rbf] = math3d.vector( fhw, -fhh, far),
+			[CORNER.rtf] = math3d.vector( fhw,  fhh, far),
 		}
 
 		local frustum_points = math3d.frustum_points(projmat)
-		print(tu.tabs(TWO_TAB) .. "frustum points:")
 		assert(math3d.array_size(frustum_points) == #testpoints)
+		print(tu.tabs(TWO_TAB) .. "frustum points:")
+		tu.print_box_points(frustum_points, TWO_TAB)
 		for i=1, #testpoints do
 			assert(math3d.isequal(math3d.array_index(frustum_points, i), testpoints[i]))
 		end
-
-		print(tu.tabs(TWO_TAB) .. "frustum points:")
-		tu.print_box_points(frustum_points, TWO_TAB)
 	end
 
 	print "\t===FRUSTUM AABB INTERSET==="

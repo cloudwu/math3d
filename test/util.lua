@@ -37,13 +37,84 @@ function util.print_points(points, tabnum)
 end
 
 function util.print_aabb(aabb, tabnum)
-	local info = ("minv:%s, maxv:%s"):format(math3d.array_index(aabb, 1), math3d.array_index(aabb, 2))
+	local info = ("minv:%s, maxv:%s"):format(math3d.tostring(math3d.array_index(aabb, 1)), math3d.tostring(math3d.array_index(aabb, 2)))
 	util.print_with_tab(info, tabnum)
 end
 
 function util.check_aabb(aabb, minv, maxv)
 	assert(math3d.isequal(minv, math3d.array_index(aabb, 1)))
 	assert(math3d.isequal(maxv, math3d.array_index(aabb, 2)))
+end
+
+local corner_names = {
+	"lbn", "ltn", "rbn", "rtn",
+	"lbf", "ltf", "rbf", "rtf",
+}
+
+util.corner_names = corner_names
+util.corner_indices = {
+	lbn = 1,
+	ltn = 2,
+	rbn = 3,
+	rtn = 4,
+	lbf = 5,
+	ltf = 6,
+	rbf = 7,
+	rtf = 8,
+	count = 8,
+}
+
+util.plane_indiecs = {
+	left = 1,
+	right = 2,
+	bottom = 3,
+	top = 4,
+	near = 5,
+	far = 6,
+	count = 6,
+}
+
+util.plane_names = {
+	"left",
+	"right",
+	"bottom",
+	"top",
+	"near",
+	"far",
+}
+
+function util.print_box_points(points, tabnum)
+	assert(math3d.array_size(points) == 8)
+
+	local function point_name(pidx, tabnum)
+		return ('\t'):rep(tabnum or 0) .. ("%s: %s"):format(corner_names[pidx], math3d.tostring(math3d.array_index(points, pidx)))
+	end
+
+	local function point_pairs(pidx1, pidx2, tabnum)
+		return ("%s;\t%s"):format(point_name(pidx1, tabnum), point_name(pidx2))
+	end
+	local t = {
+		point_pairs(1, 5, tabnum),
+		point_pairs(2, 6, tabnum),
+		point_pairs(3, 7, tabnum),
+		point_pairs(4, 8, tabnum),
+	}
+
+	return print(table.concat(t, "\n"))
+end
+
+function util.print_box_planes(planes, tabnum)
+	assert(math3d.array_size(planes) == 6)
+
+	local function plane_name(pidx, tabnum)
+		return util.tabs(tabnum) .. math3d.tostring(math3d.array_index(planes, pidx))
+	end
+	local t = {}
+	for i=1, 6 do
+		t[#t+1] = plane_name(i, tabnum)
+	end
+
+	print(table.concat(t, '\n'))
 end
 
 function util.print_mat(mat)

@@ -2337,15 +2337,6 @@ lpoints_center(lua_State *L) {
 }
 
 static int
-lpoints_radius(lua_State *L) {
-	struct math_context *M = GETMC(L);
-	const math_t points = box_points_from_index(L, M, 1);
-	const math_t center = vector_from_index(L, M, 2);
-	lua_pushnumber(L, math3d_frustum_max_radius(M, points, center));
-	return 1;
-}
-
-static int
 lpoints_aabb(lua_State *L){
 	struct math_context *M = GETMC(L);
 	const math_t points = box_points_from_index(L, M, 1);
