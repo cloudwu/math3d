@@ -90,12 +90,6 @@ MATH_TO_HANDLE(math_t id) {
 	return (void *)id.idx;
 }
 
-static inline math_t
-LUAID(lua_State *L, int index) {
-	luaL_checktype(L, index, LUA_TLIGHTUSERDATA);
-	return HANDLE_TO_MATH(lua_touserdata(L, index));
-}
-
 static inline void
 lua_pushmath(lua_State *L, math_t id) {
 	lua_pushlightuserdata(L, MATH_TO_HANDLE(id));
@@ -754,6 +748,7 @@ new_object(lua_State *L, int type, from_table_func from_table, int narray) {
 			}
 			break; }
 		default:
+			id = MATH_NULL;
 			luaL_error(L, "Invalid %s argument number %d", math_typename(type), argn);
 		}
 	}
