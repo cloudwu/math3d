@@ -1158,8 +1158,81 @@ math3d_aabb_center_extents(struct math_context *M, math_t aabb) {
 	return result;
 }
 
+// plane define:
+//		nx * px + ny*py + nz*pz + d = 0 ==> dot(n, p) + d = 0 ==> d = -dot(n, p) | dot(n, p) = -d, where n is normalize vector
+//	1 : in front of plane
+//	0 : lay on plane
+// -1 : in back of plane
+
+// distance of point P to plane:
+//	we make: Plane.xyz equal to plane's normal, Plane.w is equal to d, so the plane equation is:
+//		Plane.x*px + Plane.y*py + Plane.z*pz + Plane.w = 0
+//	we make D is the point P to Plane's distance:
+//		D = (P.x * Plane.x + P.y * Plane.y + P.z * Plane.z + Plane.w) / length(Plane.xyz) ==> dot(P.xyz, Plane.xyz) / length(Plane.xyz)
+//	if Plane's normal is 1
+//		D = dot(P.xyz, Plane.xyz) + Plane.w
+
+static inline glm::vec4
+create_plane(const glm::vec3& n, float d){
+	return glm::vec4(n, -d);
+}
+
+static inline glm::vec4
+create_plane(const glm::vec3& n, const glm::vec3& p){
+	return create_plane(n, glm::dot(n, p));
+}
+
+math_t
+math3d_plane(struct math_context* M, math_t n, float d){
+	math_t planeid;
+	auto &plane = allocvec4(M, &planeid);
+	plane = create_plane(VEC3(M, n), d);
+	return planeid;
+}
+
+math_t
+math3d_plane_from_normal_point(struct math_context* M, math_t n, math_t p) {
+	math_t planeid;
+	auto &plane = allocvec4(M, &planeid);
+	plane = create_plane(VEC3(M, n), VEC3(M, p));
+	return planeid;
+}
+
+//we assume plane's normal is normalized
+static inline float
+point2plane(const glm::vec3 &pt, const glm::vec4 &plane){
+	return glm::dot(pt, V3R(plane)) + plane.w;
+}
+
+float
+math3d_point2plane(struct math_context *M, math_t pt, math_t plane) {
+	return point2plane(VEC3(M, pt), VEC(M, plane));
+}
+
+static inline int
+plane_test_point(const glm::vec4 &plane, const glm::vec3 &p){
+	const float d = point2plane(p, plane);
+	// outside frustum
+	if (std::fabs(d) < 1e-6f){
+		return 0;
+	}
+
+	if (d < 0){
+		return -1;
+	}
+
+	return 1;
+}
+
+int
+math3d_plane_test_point(struct math_context * M, math_t plane, math_t p){
+	return plane_test_point(VEC(M, plane), VEC3(M, p));
+}
+
 static int
-plane_intersect(const glm::vec4& plane, const glm::vec4 &min, const glm::vec4 &max) {
+plane_aabb_intersect(const glm::vec4& plane, const struct AABB &aabb) {
+	const glm::vec4 &min = aabb.minv;
+	const glm::vec4 &max = aabb.maxv;
 	float minD, maxD;
 	if (plane.x > 0.0f) {
 		minD = plane.x * min.x;
@@ -1204,12 +1277,7 @@ plane_intersect(const glm::vec4& plane, const glm::vec4 &min, const glm::vec4 &m
 
 int
 math3d_aabb_intersect_plane(struct math_context *M, math_t aabb, math_t plane) {
-	auto t = AABB(M, aabb);
-	return plane_intersect(
-		VEC(M, plane),
-		t.minv,
-		t.maxv
-	);
+	return plane_aabb_intersect(VEC(M, plane), AABB(M, aabb));
 }
 
 math_t
@@ -1415,7 +1483,7 @@ math3d_frustum_intersect_aabb(struct math_context *M, math_t planes, math_t aabb
 	int where = 1;
 	for (int ii = 0; ii < 6; ++ii){
 		const auto &p = VECPTR(planes_v + ii * 4);
-		const int w = plane_intersect(p, a.minv, a.maxv);
+		const int w = plane_aabb_intersect(p, a);
 		if (w < 0)
 			return -1;
 
@@ -1470,38 +1538,6 @@ math3d_frustum_points_with_nearfar(struct math_context *M, math_t m, float n, fl
 math_t
 math3d_frustum_points(struct math_context *M, math_t m, int homogeneous_depth) {
 	return math3d_frustum_points_(M, m, homogeneous_depth ? ndc_points_NO : ndc_points_ZO);
-}
-
-
-// plane define:
-//		nx * px + ny*py + nz*pz + d = 0 ==> dot(n, p) + d = 0, where n is normalize vector
-//	1 : in front of plane
-//	0 : lay on plane
-// -1 : in back of plane
-float
-math3d_point2plane(struct math_context *M, math_t pt, math_t plane) {
-	return glm::dot(VEC3(M, pt), VEC3(M, plane)) + VEC(M, plane)[3];
-}
-
-static inline int
-plane_test_point(const glm::vec4 &plane, const glm::vec3 &p){
-	const float d = dot(V3R(plane), p);
-	// outside frustum
-	const float delta = d + plane.w;
-	if (std::fabs(delta) < 1e-6f){
-		return 0;
-	}
-
-	if (delta < 0){
-		return -1;
-	}
-
-	return 1;
-}
-
-int
-math3d_plane_test_point(struct math_context * M, math_t plane, math_t p){
-	return plane_test_point(VEC(M, plane), VEC3(M, p));
 }
 
 // from: https://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/raytri/
