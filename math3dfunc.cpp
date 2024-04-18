@@ -62,12 +62,12 @@ allocmat(struct math_context *M, math_t *id) {
 	return *(glm::mat4x4 *)buf;
 }
 
-static inline glm::mat4x4 &
-initmat(struct math_context *M, math_t id) {
-	check_type(M, id, MATH_TYPE_MAT);
-	float * buf = math_init(M, id);
-	return *(glm::mat4x4 *)buf;
-}
+// static inline glm::mat4x4 &
+// initmat(struct math_context *M, math_t id) {
+// 	check_type(M, id, MATH_TYPE_MAT);
+// 	float * buf = math_init(M, id);
+// 	return *(glm::mat4x4 *)buf;
+// }
 
 static inline glm::quat &
 allocquat(struct math_context *M, math_t *id) {
@@ -935,9 +935,13 @@ math3d_minmax(struct math_context *M, math_t transform, math_t points) {
 		}
 	} else {
 		const glm::mat4& m = MAT(M, transform);
-		minmax[0] = minmax[1] = m * VEC(M, p);
+		const glm::vec4& v = VEC(M, p);
+		assert(v.w == 1.f || v.w == 0.f);
+		minmax[0] = minmax[1] = m * v;
 		for (int ii=1; ii<(int)numpoints; ++ii){
-			const glm::vec4 tpp = m * VEC(M, math_index(M, points, ii));
+			const glm::vec4 &vv = VEC(M, math_index(M, points, ii));
+			assert(vv.w == 1.f || vv.w == 0.f);
+			const glm::vec4 tpp = m * vv;
 			minmax[0] = glm::min(minmax[0], tpp);
 			minmax[1] = glm::max(minmax[1], tpp);
 		}
@@ -1069,7 +1073,7 @@ math3d_dir2radian(struct math_context *M, math_t rad, float radians[2]) {
 }
 
 math_t
-math3d_frustum_center(struct math_context *M, math_t points) {
+math3d_box_center(struct math_context *M, math_t points) {
 	math_t id;
 	glm::vec4 &c = allocvec4(M, &id);
 	c = glm::vec4(0, 0, 0, 1);
@@ -1082,19 +1086,6 @@ math3d_frustum_center(struct math_context *M, math_t points) {
 	c.w = 1.f;
 
 	return id;
-}
-
-float
-math3d_frustum_max_radius(struct math_context *M, math_t points, math_t center) {
-	float maxradius = 0;
-	const glm::vec4 &c = VEC(M, center);
-	int ii;
-	for (ii = 0; ii < 8; ++ii) {
-		const glm::vec4 &p = VEC(M, math_index(M, points, ii));
-		maxradius = glm::max(glm::length(p - c), maxradius);
-	}
-
-	return maxradius;
 }
 
 math_t
@@ -1167,8 +1158,81 @@ math3d_aabb_center_extents(struct math_context *M, math_t aabb) {
 	return result;
 }
 
+// plane define:
+//		nx * px + ny*py + nz*pz + d = 0 ==> dot(n, p) + d = 0 ==> d = -dot(n, p) | dot(n, p) = -d, where n is normalize vector
+//	1 : in front of plane
+//	0 : lay on plane
+// -1 : in back of plane
+
+// distance of point P to plane:
+//	we make: Plane.xyz equal to plane's normal, Plane.w is equal to d, so the plane equation is:
+//		Plane.x*px + Plane.y*py + Plane.z*pz + Plane.w = 0
+//	we make D is the point P to Plane's distance:
+//		D = (P.x * Plane.x + P.y * Plane.y + P.z * Plane.z + Plane.w) / length(Plane.xyz) ==> dot(P.xyz, Plane.xyz) / length(Plane.xyz)
+//	if Plane's normal is 1
+//		D = dot(P.xyz, Plane.xyz) + Plane.w
+
+static inline glm::vec4
+create_plane(const glm::vec3& n, float d){
+	return glm::vec4(n, -d);
+}
+
+static inline glm::vec4
+create_plane(const glm::vec3& n, const glm::vec3& p){
+	return create_plane(n, glm::dot(n, p));
+}
+
+math_t
+math3d_plane(struct math_context* M, math_t n, float d){
+	math_t planeid;
+	auto &plane = allocvec4(M, &planeid);
+	plane = create_plane(VEC3(M, n), d);
+	return planeid;
+}
+
+math_t
+math3d_plane_from_normal_point(struct math_context* M, math_t n, math_t p) {
+	math_t planeid;
+	auto &plane = allocvec4(M, &planeid);
+	plane = create_plane(VEC3(M, n), VEC3(M, p));
+	return planeid;
+}
+
+//we assume plane's normal is normalized
+static inline float
+point2plane(const glm::vec3 &pt, const glm::vec4 &plane){
+	return glm::dot(pt, V3R(plane)) + plane.w;
+}
+
+float
+math3d_point2plane(struct math_context *M, math_t pt, math_t plane) {
+	return point2plane(VEC3(M, pt), VEC(M, plane));
+}
+
+static inline int
+plane_test_point(const glm::vec4 &plane, const glm::vec3 &p){
+	const float d = point2plane(p, plane);
+	// outside frustum
+	if (std::fabs(d) < 1e-6f){
+		return 0;
+	}
+
+	if (d < 0){
+		return -1;
+	}
+
+	return 1;
+}
+
+int
+math3d_plane_test_point(struct math_context * M, math_t plane, math_t p){
+	return plane_test_point(VEC(M, plane), VEC3(M, p));
+}
+
 static int
-plane_intersect(const glm::vec4& plane, const glm::vec4 &min, const glm::vec4 &max) {
+plane_aabb_intersect(const glm::vec4& plane, const struct AABB &aabb) {
+	const glm::vec4 &min = aabb.minv;
+	const glm::vec4 &max = aabb.maxv;
 	float minD, maxD;
 	if (plane.x > 0.0f) {
 		minD = plane.x * min.x;
@@ -1213,12 +1277,7 @@ plane_intersect(const glm::vec4& plane, const glm::vec4 &min, const glm::vec4 &m
 
 int
 math3d_aabb_intersect_plane(struct math_context *M, math_t aabb, math_t plane) {
-	auto t = AABB(M, aabb);
-	return plane_intersect(
-		VEC(M, plane),
-		t.minv,
-		t.maxv
-	);
+	return plane_aabb_intersect(VEC(M, plane), AABB(M, aabb));
 }
 
 math_t
@@ -1416,27 +1475,25 @@ math3d_frustum_planes(struct math_context *M, math_t m, int homogeneous_depth) {
 
 int
 math3d_frustum_intersect_aabb(struct math_context *M, math_t planes, math_t aabb) {
-	int ii;
-	int r = 1;
 	check_type(M, aabb, MATH_TYPE_VEC4);
 
 	auto a = AABB(M, aabb);
 
 	const float * planes_v = math_value(M, planes);
-
-	for (ii = 0; ii < 6; ++ii){
+	int where = 1;
+	for (int ii = 0; ii < 6; ++ii){
 		const auto &p = VECPTR(planes_v + ii * 4);
-		int t = plane_intersect(p, a.minv, a.maxv);
-		r = t < r ? t : r;
-		// r = -1, aabb outside one plane, means outside frustum
-		if (r < 0){
-			return r;
-		}
+		const int w = plane_aabb_intersect(p, a);
+		if (w < 0)
+			return -1;
+
+		if (w == 0)
+			where = 0;
 	}
 
-	// r = 1, aabb in front of all planes, mean inside frustum
-	// r = 0, aabb in front of part planes or aabb intersect with part planes, mean intersect frustum
-	return r;
+	// where = 1, aabb inside frustum
+	// where = 0, aabb intersect with one of frustum planes
+	return where;
 }
 
 struct frustum_corners {
@@ -1481,38 +1538,6 @@ math3d_frustum_points_with_nearfar(struct math_context *M, math_t m, float n, fl
 math_t
 math3d_frustum_points(struct math_context *M, math_t m, int homogeneous_depth) {
 	return math3d_frustum_points_(M, m, homogeneous_depth ? ndc_points_NO : ndc_points_ZO);
-}
-
-
-// plane define:
-//		nx * px + ny*py + nz*pz + d = 0 ==> dot(n, p) + d = 0, where n is normalize vector
-//	1 : in front of plane
-//	0 : lay on plane
-// -1 : in back of plane
-float
-math3d_point2plane(struct math_context *M, math_t pt, math_t plane) {
-	return glm::dot(VEC3(M, pt), VEC3(M, plane)) + VEC(M, plane)[3];
-}
-
-static inline int
-plane_test_point(const glm::vec4 &plane, const glm::vec3 &p){
-	const float d = dot(V3R(plane), p);
-	// outside frustum
-	const float delta = d + plane.w;
-	if (std::fabs(delta) < 1e-6f){
-		return 0;
-	}
-
-	if (delta < 0){
-		return -1;
-	}
-
-	return 1;
-}
-
-int
-math3d_plane_test_point(struct math_context * M, math_t plane, math_t p){
-	return plane_test_point(VEC(M, plane), VEC3(M, p));
 }
 
 // from: https://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/raytri/
@@ -1667,37 +1692,47 @@ math3d_frustum_test_point(struct math_context * M, math_t planes, math_t p){
 	return where;
 }
 
+static inline uint8_t
+find_points_in_aabb(struct math_context* M, math_t testpoints, math_t aabb, glm::vec4 *points){
+	uint8_t n = 0;
+	for (uint8_t ii=0; ii<BP_count;++ii){
+		math_t p = math_index(M, testpoints, ii);
+		if (math3d_aabb_test_point(M, aabb, p) >= 0){
+			points[n++] = VEC(M, p);
+		}
+	}
+	return n;
+}
+
+static inline uint8_t
+find_points_in_frustum(struct math_context *M, math_t testpoints, math_t frustumplanes, glm::vec4 *points){
+	uint8_t n = 0;
+	for (uint8_t ii=0; ii<BP_count;++ii){
+		math_t p = math_index(M, testpoints, ii);
+		if (math3d_frustum_test_point(M, frustumplanes, p) >= 0){
+			points[n++] = VEC(M, p);
+		}
+	}
+	return n;
+}
+
 math_t
 math3d_frstum_aabb_intersect_points(struct math_context * M, math_t m, math_t aabb, int HOMOGENEOUS_DEPTH){
-	int numpoint = 0;
-
 	constexpr int MAXPOINT = 64;
 	glm::vec4 points[MAXPOINT];
 
 	const math_t frustumpoints	= math3d_frustum_points(M, m, HOMOGENEOUS_DEPTH);
 
-	auto test_points_in_box = [M, &numpoint, &points](math_t testpoints, auto checkop){
-		uint8_t n = 0;
-		for (uint8_t ii=0; ii<BP_count;++ii){
-			math_t p = math_index(M, testpoints, ii);
-			if (checkop(p)){
-				points[n++] = VEC(M, p);
-			}
-		}
-
-		numpoint += n;
-		return n;
-	};
-
-	if (8 == test_points_in_box(frustumpoints, [M, aabb](math_t p){ return math3d_aabb_test_point(M, aabb, p) >= 0; })){
+	uint8_t numpoint = find_points_in_aabb(M, frustumpoints, aabb, points);
+	if (8 == numpoint){
 		return math_import(M, (const float*)(&points), MATH_TYPE_VEC4, numpoint);
 	}
 
 	const math_t aabbpoints		= math3d_aabb_points(M, aabb);
 	const math_t frustumplanes	= math3d_frustum_planes(M, m, HOMOGENEOUS_DEPTH);
-
-	if (8 == test_points_in_box(aabbpoints, [M, frustumplanes](math_t p){ return math3d_frustum_test_point(M, frustumplanes, p) >= 0; })){
-		assert(numpoint == 8);
+	const uint8_t ptinfrustum = find_points_in_frustum(M, aabbpoints, frustumplanes, points+numpoint);
+	numpoint += ptinfrustum;
+	if (8 == ptinfrustum){
 		return math_import(M, (const float*)(&points), MATH_TYPE_VEC4, numpoint);
 	}
 

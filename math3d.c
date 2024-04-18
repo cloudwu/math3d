@@ -90,12 +90,6 @@ MATH_TO_HANDLE(math_t id) {
 	return (void *)id.idx;
 }
 
-static inline math_t
-LUAID(lua_State *L, int index) {
-	luaL_checktype(L, index, LUA_TLIGHTUSERDATA);
-	return HANDLE_TO_MATH(lua_touserdata(L, index));
-}
-
 static inline void
 lua_pushmath(lua_State *L, math_t id) {
 	lua_pushlightuserdata(L, MATH_TO_HANDLE(id));
@@ -334,9 +328,9 @@ object_from_field(lua_State *L, struct math_context *M, int index, const char *k
 }
 
 static math_t
-quat_from_axis(lua_State *L, struct math_context *M, int index, const char *key) {
-	if (lua_getfield(L, index, key) == LUA_TNIL) {
-		luaL_error(L, "Quat invalid arguments");
+quat_from_axis(lua_State *L, struct math_context *M, int index) {
+	if (lua_getfield(L, index, "axis") == LUA_TNIL) {
+		luaL_error(L, "Need .axis for quat");
 	}
 
 	math_t axis = object_from_index(L, M, -1, MATH_TYPE_VEC4, vector_from_table);
@@ -355,7 +349,7 @@ static math_t
 quat_from_table(lua_State *L, struct math_context *M, int index) {
 	size_t n = getlen(L, index);
 	if (n == 0) {
-		return quat_from_axis(L, M, index, "axis");
+		return quat_from_axis(L, M, index);
 	} else if (n == 3) {
 		math_t tmp = math_vec4(M, NULL);
 		float *e = math_init(M, tmp);
@@ -754,6 +748,7 @@ new_object(lua_State *L, int type, from_table_func from_table, int narray) {
 			}
 			break; }
 		default:
+			id = MATH_NULL;
 			luaL_error(L, "Invalid %s argument number %d", math_typename(type), argn);
 		}
 	}
@@ -799,7 +794,7 @@ quat_from_index(lua_State *L, struct math_context *M, int index) {
 }
 
 static inline math_t
-frustum_planes_from_index(lua_State *L, struct math_context *M, int index){
+box_planes_from_index(lua_State *L, struct math_context *M, int index){
 	math_t planes = object_from_index(L, M, index, MATH_TYPE_VEC4, vector_from_table);
 	if (math_isnull(planes) || math_size(M, planes) != 6)
 		luaL_error(L, "Invalid Frustum Planes");
@@ -807,7 +802,7 @@ frustum_planes_from_index(lua_State *L, struct math_context *M, int index){
 }
 
 static inline math_t
-frustum_points_from_index(lua_State *L, struct math_context *M, int index){
+box_points_from_index(lua_State *L, struct math_context *M, int index){
 	math_t points = object_from_index(L, M, index, MATH_TYPE_VEC4, vector_from_table);
 	if (math_isnull(points) || math_size(M, points) != 8)
 		luaL_error(L, "Invalid Frustum Planes");
@@ -2077,7 +2072,7 @@ lfrustum_planes(lua_State *L) {
 static int
 lfrustum_intersect_aabb(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	const math_t planes = frustum_planes_from_index(L, M, 1);
+	const math_t planes = box_planes_from_index(L, M, 1);
 	const math_t aabb = aabb_from_index(L, M, 2);
 	lua_pushinteger(L, math3d_frustum_intersect_aabb(M, planes, aabb));
 	return 1;
@@ -2086,7 +2081,7 @@ lfrustum_intersect_aabb(lua_State *L) {
 static int
 lfrustum_intersect_aabb_list(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	math_t planes = frustum_planes_from_index(L, M, 1);
+	math_t planes = box_planes_from_index(L, M, 1);
 
 	luaL_checktype(L, 2, LUA_TTABLE);
 	const int numelem = (int)lua_rawlen(L, 2);
@@ -2334,26 +2329,17 @@ lmul_array(lua_State *L) {
 static int
 lpoints_center(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	const math_t points = frustum_points_from_index(L, M, 1);
-	const math_t center = math3d_frustum_center(M, points);
+	const math_t points = box_points_from_index(L, M, 1);
+	const math_t center = math3d_box_center(M, points);
 	lua_pushmath(L, center);
 
 	return 1;
 }
 
 static int
-lpoints_radius(lua_State *L) {
-	struct math_context *M = GETMC(L);
-	const math_t points = frustum_points_from_index(L, M, 1);
-	const math_t center = vector_from_index(L, M, 2);
-	lua_pushnumber(L, math3d_frustum_max_radius(M, points, center));
-	return 1;
-}
-
-static int
 lpoints_aabb(lua_State *L){
 	struct math_context *M = GETMC(L);
-	const math_t points = frustum_points_from_index(L, M, 1);
+	const math_t points = box_points_from_index(L, M, 1);
 	lua_pushmath(L, math3d_frusutm_aabb(M, points));
 	return 1;
 }
@@ -2361,53 +2347,67 @@ lpoints_aabb(lua_State *L){
 static int
 lplane(lua_State *L){
 	struct math_context *M = GETMC(L);
-	math_t r = math_vec4(M, NULL);
-	float * tmp = math_init(M, r);
+	if (lua_gettop(L) != 2){
+		luaL_error(L, "create plane need 2 argument, first is plane normal(normliazed are nice), second can be: 'float'(mean d = -dot(n, p)) or 'vec4'(mean point in plane)");
+	}
 
-	math_t point = vector_from_index(L, M, 1);
-	math_t normal_id = vector_from_index(L, M, 2);
+	math_t n = vector_from_index(L, M, 1);
 
-	const float * normal = math_value(M, normal_id);
-
-	tmp[0] = normal[0];
-	tmp[1] = normal[1];
-	tmp[2] = normal[2];
-	tmp[3] = math3d_dot(M, point, normal_id);
-
-	lua_pushmath(L, r);
+	const int ltype = lua_type(L, 2);
+	if (ltype == LUA_TLIGHTUSERDATA){
+		math_t pt = vector_from_index(L, M, 2);
+		lua_pushmath(L, math3d_plane_from_normal_point(M, n, pt));
+	} else if (ltype == LUA_TNUMBER){
+		lua_pushmath(L, math3d_plane(M, n, lua_tonumber(L, 2)));
+	} else {
+		luaL_error(L, "Invalid argument for create plane");
+	}
 
 	return 1;
 }
-
 static int
 lplane_ray(lua_State *L) {
-	/*
-        ray: [o, d1], p(t) = o + t*d1, o is ray origin and d1 is the ray direction
-        plane: [n, d], p dot n = d, p is a point in plane, which we want; n is the normal, d is the origin point to plane distance, is a scalar
-        
-        we assume ray and plane interset, so p(t) is plane's p:
-            p(t) dot n = d
-            (o+t*d1) dot n = d
-        if we calculate t, we get the intersetion point:
-            o dot n + t * (d1 dot n) = d
-            t = (d - o dot n) / (d1 dot n)
-    */
-	struct math_context *M = GETMC(L);
-	math_t ray_o = vector_from_index(L, M, 1);
-	math_t ray_d = vector_from_index(L, M, 2);
+	// ray: [ro, rd], r(t) = ro + t*rd, ro is ray origin and rd is the ray direction
+	// plane: [n, d] ==> px*nx + py*ny + pz*nz + d = 0, dot(n, p) + d = 0 ==> d = -dot(n, p)
+	
+	// we assume ray and plane interset, so r(t) is plane's point:
+	//     dot(n, r(t))		+ d = 0
+	//     dot(n, (ro+t*rd))+ d = 0
+	// if we calculate t, we get the intersetion point:
+	//		dot(n, ro) + t * dot(n, rd) + d = 0, so:
+	//			t = (-d - dot(n, ro)) / dot(n, rd)
 
-	math_t plane = vector_from_index(L, M, 3);
-	//t = (d - o dot n) / (d1 dot n)
-	float dot_do = math3d_dot(M, ray_d, plane);
+	// where -d is plane.w, n is plane.xyz, the plane normal no need to be normalized
+	// t = (-d - dot(n, ro)) / dot(n, rd) = (plane.w - dot(ro, plane.xyz)/dot(plane.xyz, rd))
+
+	struct math_context *M = GETMC(L);
+	const math_t ro = vector_from_index(L, M, 1);
+	const math_t rd = vector_from_index(L, M, 2);
+
+	const math_t plane = vector_from_index(L, M, 3);
+	const int withpt = lua_isnoneornil(L, 4) ? 0 : lua_toboolean(L, 4);
+	const float dot_do = math3d_dot(M, rd, plane);
 
 	//ray direction is perpendicular to plane normal, not interset
 	if (fabs(dot_do) < 1e-7){
 		return 0;
 	}
 
-	const float dis = math_value(M, plane)[3];
-	float t = (dis - math3d_dot(M, ray_o, plane)) / dot_do;
+	const float d = math_value(M, plane)[3];
+	float t = (-d - math3d_dot(M, ro, plane)) / dot_do;
 	lua_pushnumber(L, t);
+
+	if (withpt){
+		float r[4];
+		const float* rdv = math_value(M, rd);
+		const float* rov = math_value(M, ro);
+		for(int ii=0; ii<3; ++ii){
+			r[ii] = rov[ii] + rdv[ii] * t;
+		}
+		r[3] = 1.f;
+		lua_pushmath(L, math_import(M, r, MATH_TYPE_VEC4, 1));
+		return 2;
+	}
 	return 1;
 }
 
@@ -2660,7 +2660,6 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 
 		//points
 		{ "points_center",	lpoints_center},
-		{ "points_radius",	lpoints_radius},
 		{ "points_aabb",	lpoints_aabb},
 		
 		//plane
