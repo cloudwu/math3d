@@ -1,7 +1,8 @@
-	debug.getregistry().MATH3D_MAXPAGE = 1024
+debug.getregistry().MATH3D_MAXPAGE = 1024
 
 local math3d = require "math3d"
 
+local tu = require "test.util"
 do
 	print "---- constant -------"
 	local c = math3d.constant "null"
@@ -101,37 +102,6 @@ do
 	print("log(v3, 3):", math3d.tostring(vv))
 end
 
-local ONE_TAB<const>, TWO_TAB<const> = 1, 2
-
-local function create_ray(p1, p2)
-	return {o=p1, d=math3d.sub(p2, p1)}
-end
-
-local function tabs(n)
-	return ('\t'):rep(n or 0)
-end
-
-local function print_with_tab(s, tabnum)
-	print(tabs(tabnum) .. s)
-end
-local function print_ray(r, tabnum)
-	print_with_tab(("ray.o:%s, ray.d:%s"):format(math3d.tostring(r.o), math3d.tostring(r.d)), tabnum)
-end
-
-local function print_triangle(v0, v1, v2, tabnum)
-	print_with_tab(("triangles:%s, %s, %s"):format(math3d.tostring(v0), math3d.tostring(v1), math3d.tostring(v2)), tabnum)
-end
-
-local function print_points(points, tabnum)
-	local t = {}
-	local tab = ('\t'):rep(tabnum or 0)
-	for i=1, math3d.array_size(points) do
-		local p = math3d.array_index(points, i)
-		t[#t+1] = tab .. math3d.tostring(p)
-	end
-	print(table.concat(t, "\n"))
-end
-
 print "-----plane test-----"
 do
 	--[[
@@ -191,7 +161,7 @@ local function print_box_planes(planes, tabnum)
 	assert(math3d.array_size(planes) == 6)
 
 	local function plane_name(pidx, tabnum)
-		return tabs(tabnum) .. math3d.tostring(math3d.array_index(planes, pidx))
+		return tu.tabs(tabnum) .. math3d.tostring(math3d.array_index(planes, pidx))
 	end
 	local t = {}
 	for i=1, 6 do
@@ -205,19 +175,19 @@ print "----- ray/line interset with triangles -----"
 do
 	local v0, v1, v2 = math3d.vector(-1.0, 0.0, 0.0, 1.0), math3d.vector(0.0, 1.0, 0.0, 1.0), math3d.vector(1.0, 0.0, 0.0, 1.0)
 	print "\ttriangle1:"
-	print_triangle(v0, v1, v2, 1)
+	tu.print_triangle(v0, v1, v2, 1)
 
 	local v3, v4, v5 = math3d.vector(-1.0, 0.0, 2.0, 1.0), math3d.vector(0.0, 1.0, 2.0, 1.0), math3d.vector(1.0, 0.0, 2.0, 1.0)
 	print "\ttriangle2:"
-	print_triangle(v3, v4, v5, 1)
+	tu.print_triangle(v3, v4, v5, 1)
 
 	local v6, v7, v8 = math3d.vector(0.0, 0.0, 1.0, 1.0), math3d.vector(0.0, 1.0, 0.0, 1.0), math3d.vector(0.0, 0.0, -1.0, 1.0)
 	print "\ttriangle3:"
-	print_triangle(v6, v7, v8, 1)
+	tu.print_triangle(v6, v7, v8, 1)
 
 	local ray = {o=math3d.vector(0.0, 0.0, 0.0), d=math3d.vector(0.0, 0.0, 1.0)}
 	print "\tinterset with ray:"
-	print_ray(ray, 1)
+	tu.print_ray(ray, 1)
 
 	print "\tsegment1 interset with triangle:"
 	local s0, s1 = math3d.vector(0, 0, 1, 1), math3d.vector(0, 0, 3, 1)
@@ -253,10 +223,10 @@ do
 	local ray1 = {o=math3d.vector(0.0, 0.0, 0.0, 1.0), d=math3d.vector(0.0, 0.0, -1.0)}
 	local function do_ray_box_test(ray, boxpoints)
 		print "\tray:"
-		print_ray(ray, 2)
+		tu.print_ray(ray, 2)
 		local resultpoints = math3d.ray_intersect_box(ray.o, ray.d, boxpoints)
 		print "\tray intersect results:"
-		print_points(resultpoints, 2)
+		tu.print_points(resultpoints, 2)
 		return resultpoints
 	end
 
@@ -265,18 +235,18 @@ do
 	assert(math3d.array_size(results) == 1)
 
 	print "\tray box test 2:"
-	local ray2 = create_ray(math3d.vector(0.0, 0.0, -1.0, 1.0), math3d.vector(-1.0, 0.0, 0.0, 1.0))
+	local ray2 = tu.create_ray(math3d.vector(0.0, 0.0, -1.0, 1.0), math3d.vector(-1.0, 0.0, 0.0, 1.0))
 	results = do_ray_box_test(ray2, aabbpoints)
 	assert(math3d.array_size(results) == 2)
 
 	print "\tray box test 3:"
 	--local ray3 = create_ray(math3d.array_index(aabbpoints, 1), math3d.array_index(aabbpoints, 5))
-	local ray3 = create_ray(math3d.vector(0.0, 0.0, -1.0, 1.0), math3d.vector(0.0, 0.0, 1.0, 1.0))
+	local ray3 = tu.create_ray(math3d.vector(0.0, 0.0, -1.0, 1.0), math3d.vector(0.0, 0.0, 1.0, 1.0))
 	results = do_ray_box_test(ray3, aabbpoints)
 	assert(math3d.array_size(results) == 2)
 
 	print "\tray box test 4:"
-	local ray4 = create_ray(math3d.vector(-1.0, 0.0, 0.0, 1.0), math3d.vector(1.0, 0.0, 1.0, 1.0))
+	local ray4 = tu.create_ray(math3d.vector(-1.0, 0.0, 0.0, 1.0), math3d.vector(1.0, 0.0, 1.0, 1.0))
 	results = do_ray_box_test(ray4, aabbpoints)
 	assert(math3d.array_size(results) == 2)
 
@@ -286,12 +256,12 @@ do
 	print_box_points(aabbpoints2, 2)
 
 	print "\tray box test 5:"
-	local ray5 = create_ray(math3d.vector(0.0, 0.0, 0.0, 1.0), math3d.vector(2.0, 2.0, 2.0, 1.0))
+	local ray5 = tu.create_ray(math3d.vector(0.0, 0.0, 0.0, 1.0), math3d.vector(2.0, 2.0, 2.0, 1.0))
 	results = do_ray_box_test(ray5, aabbpoints2)
 	assert(math3d.array_size(results) == 2)
 
 	print "\tray box test 6:"
-	local ray6 = create_ray(math3d.vector(1.0, 1.0, -1.0, 1.0), math3d.vector(2.0, 2.0, 2.0, 1.0))
+	local ray6 = tu.create_ray(math3d.vector(1.0, 1.0, -1.0, 1.0), math3d.vector(2.0, 2.0, 2.0, 1.0))
 	results = do_ray_box_test(ray6, aabbpoints2)
 	assert(math3d.array_size(results) == 2)
 end
@@ -423,491 +393,21 @@ do
 	print("transform point with matrix", math3d.tostring(p), "=", math3d.tostring(r_p))
 end
 
-print "===construct coordinate from forward vector==="
+print "===FORWARD VECTOR==="
 do
 	local forward = math3d.normalize(math3d.vector {1, 1, 1})
 	local right, up = math3d.base_axes(forward)
 	print("forward:", math3d.tostring(forward), "right:", math3d.tostring(right), "up:", math3d.tostring(up))
 end
 
-print "===PROJ===="
-do
-	local projmat = math3d.projmat {fov=90, aspect=1, n=1, f=1000}
-	print("PROJ", math3d.tostring(projmat))
-end
+require "test.frustum_aabb"
+require "test.array"
+require "test.matrix"
+require "test.adapter"
+require "test.slot"
 
-print "===AABB&FRUSTUM==="
-local function print_aabb(aabb, tabnum)
-	local info = ("minv:%s, maxv:%s"):format(math3d.array_index(aabb, 1), math3d.array_index(aabb, 2))
-	print_with_tab(info, tabnum)
-end
+require "test.alive"
 
-local function check_aabb(aabb, minv, maxv)
-	assert(math3d.isequal(minv, math3d.array_index(aabb, 1)))
-	assert(math3d.isequal(maxv, math3d.array_index(aabb, 2)))
-end
-
-local box_line_indices<const> = {
-	0, 4, 1, 5,
-	2, 6, 3, 7,
-
-	0, 2, 1, 3,
-	4, 6, 5, 7,
-
-	0, 1, 2, 3,
-	4, 5, 6, 7,
-}
-
-do
-	local aabb = math3d.minmax(math3d.array_vector(math3d.vector(0, 4, 2), math3d.vector(2, 2, 4)))
-	assert(math3d.array_size(aabb) == 2)
-	local check_minv, check_maxv = math3d.vector(0, 2, 2), math3d.vector(2, 4, 4)
-	check_aabb(aabb, check_minv, check_maxv)
-	print_aabb(aabb, ONE_TAB)
-
-	local transformmat = math3d.matrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1)
-	print_with_tab("transform:" .. math3d.tostring(transformmat), ONE_TAB)
-
-	aabb = math3d.aabb_transform(transformmat, aabb)
-	local translte_delta = math3d.vector(1, 1, 1, 1)
-	check_aabb(aabb, math3d.add(translte_delta, check_minv), math3d.add(translte_delta, check_maxv))
-	print "\ttransformed aabb:"
-	print_aabb(aabb, ONE_TAB)
-
-	print "\t===TEST FRUSTUM POINTS==="
-	do
-		local fov60<const> 				= 60
-		local fov60radian<const> 		= math.rad(fov60)
-		local half_fov60radian<const> 	= fov60radian * 0.5
-	
-		local near<const>, far<const> 	= 1, 3
-		local aspect<const> 			= 1 -- width/height
-
-		local hfov60<const>				= aspect * fov60 --width/height = hfov/fov ==> aspect * fov = hfov
-		local hfov60radian<const>		= math.rad(hfov60)
-		local half_hfov60radian<const>	= hfov60radian * 0.5
-		local projmat = math3d.projmat{aspect=aspect, fov=fov60, n=near, f=near}
-
-		local test_plane_normals<const> = {
-			left 	= math3d.transform(math3d.quaternion{axis=math3d.vector(0.0, 1.0, 0.0), r=-half_hfov60radian}, math3d.vector(0.0, 0.0, 1.0, 0.0), 0),
-			right 	= math3d.transform(math3d.quaternion{axis=math3d.vector(0.0, 1.0, 0.0), r= half_hfov60radian}, math3d.vector(0.0, 0.0, 1.0, 0.0), 0),
-			top 	= math3d.transform(math3d.quaternion{axis=math3d.vector(1.0, 0.0, 0.0), r=-half_fov60radian},  math3d.vector(0.0, 0.0, 1.0, 0.0), 0),
-			bottom 	= math3d.transform(math3d.quaternion{axis=math3d.vector(1.0, 0.0, 0.0), r= half_fov60radian},  math3d.vector(0.0, 0.0, 1.0, 0.0), 0),
-			near	= math3d.vector(0.0, 0.0, 1.0, 0.0),
-			far		= math3d.vector(0.0, 0.0,-1.0, 0.0),
-		}
-
-		--check planes
-		local frustum_planes = math3d.frustum_planes(projmat)
-		print(tabs(2) .. "frustum planes:")
-		print_box_planes(frustum_planes, TWO_TAB)
-		assert(#test_plane_normals == math3d.array_size(frustum_planes))
-		for i=1, #test_plane_normals do
-			local p1 = math3d.normalize(test_plane_normals[i])
-			local p2 = math3d.normalize(math3d.array_index(frustum_planes, i))
-			assert(math3d.isequal(p1, p2))
-		end
-
-		--check points
-		--near half width
-		local cosv = math.cos(half_hfov60radian)
-		local nhw<const> = near/cosv
-		local nhh<const> = nhw / aspect
-
-		--far half width
-		local fhw<const> = far/cosv
-		local fhh<const> = fhw/aspect
-		local testpoints<const> = {
-			lbn = math3d.vector(-nhw, -nhh, near),
-			ltn = math3d.vector(-nhw,  nhh, near),
-			rbn = math3d.vector( nhw, -nhh, near),
-			rtn = math3d.vector( nhw,  nhh, near),
-
-			lbf = math3d.vector(-fhw, -fhh, far),
-			ltf = math3d.vector(-fhw,  fhh, far),
-			rbf = math3d.vector( fhw, -fhh, far),
-			rtf = math3d.vector( fhw,  fhh, far),
-		}
-
-		local frustum_points = math3d.frustum_points(projmat)
-		print(tabs(2) .. "frustum points:")
-		assert(math3d.array_size(frustum_points) == #testpoints)
-		for i=1, #testpoints do
-			assert(math3d.isequal(math3d.array_index(frustum_points, i), testpoints[i]))
-		end
-
-		print(tabs(2) .. "frustum points:")
-		print_box_points(frustum_points, TWO_TAB)
-	end
-
-	print "\t===FRUSTUM AABB INTERSET==="
-	do
-		local projmat = math3d.projmat{ortho=true, l=-1, r=1, b=-1, t=1, n=0, f=2}
-		local aabb = math3d.aabb(math3d.vector(0.0, 0.0, 0.0, 0.0), math3d.vector(1.0, 1.0, 1.0, 0.0))
-		print_aabb(aabb, TWO_TAB)
-
-		local frustum_points = math3d.frustum_points(projmat)
-		print_box_points(frustum_points, TWO_TAB)
-
-		local frustum_planes = math3d.frustum_planes(projmat)
-		print_box_planes(frustum_planes, TWO_TAB)
-
-		assert(math3d.frustum_intersect_aabb(frustum_planes, aabb) == 0)
-
-		local aabb2 = math3d.aabb(math3d.vector(-3, 0.0, 0.0, 0.0), math3d.vector(-2, 1.0, 1.0, 0.0))
-		assert(math3d.frustum_intersect_aabb(frustum_planes, aabb2) < 0)
-
-		local aabb3 = math3d.aabb(math3d.vector(0.0, 0.0, 0.5, 0.0), math3d.vector(0.5, 0.5, 1.0, 0.0))
-		assert(math3d.frustum_intersect_aabb(frustum_planes, aabb3) > 0)
-	end
-
-	print "\t===TEST BOX CENTER AND RADIUS==="
-	do
-		local aabb 		= math3d.aabb(math3d.vector(0.0, 0.0, 0.0, 0.0), math3d.vector(1.0, 1.0, 1.0, 0.0))
-		print_aabb(aabb, ONE_TAB)
-		local points 	= math3d.aabb_points(aabb)
-
-		local center 	= math3d.points_center(points)
-		local aabb2		= math3d.minmax(points)
-		local center2, extents = math3d.aabb_center_extents(aabb2)
-		assert(math3d.isequal(center, center2))
-		assert(math3d.isequal(center, math3d.vector(0.5, 0.5, 0.5)))
-		assert(math.abs(math3d.length(extents) * 2 - math.sqrt(3)) < 1e-6)
-	end
-
-	print "\t===frustum test points==="
-	do
-		local p = math3d.vector(0.0, 0.0, 0.0, 1.0)
-		local p1 = math3d.vector(0.0, 0.0, 10.0, 1.0)
-
-		local f = math3d.frustum_planes(math3d.projmat{ortho=true, l=-1, r=1, b=-1, t=1, n=-1, f=1})
-		assert(math3d.frustum_test_point(f, p) > 0)
-		assert(math3d.frustum_test_point(f, p1) < 0)
-		assert(math3d.frustum_test_point(f, math3d.vector(-1.0, 0.0, 0.0, 1.0)) == 0)
-
-		local f1 = math3d.frustum_planes(math3d.projmat{l=-1, r=1, b=-1, t=1, n=1, f=20})
-		assert(math3d.frustum_test_point(f1, p) < 0)
-		assert(math3d.frustum_test_point(f1, p1) > 0)
-
-		print "\t passed!"
-	end
-
-	print "\t===AABB&minmax===="
-
-	local points = {
-		math3d.vector(1, 0, -1, -10),
-		math3d.vector(1, 2, -1, 1),
-		math3d.vector(1, 4, -5, 1),
-		math3d.vector(-2, 0, -1, 1),
-	}
-
-	local aabb = math3d.minmax(points)
-	local aabb2 = math3d.aabb()
-	aabb2 = math3d.aabb_append(aabb2, points)
-
-	print("minmax-aabb:", math3d.tostring(aabb))
-	print("aabb-append:", math3d.tostring(aabb2))
-
-	--aabb test merge
-	local aabb = math3d.aabb()
-	assert(not math3d.aabb_isvalid(aabb))
-
-	local aabb2 = math3d.aabb(math3d.vector(-1.0, 0.0, 0.0), math3d.vector(0.0, 2.0, 3.0))
-
-	local mergeaabb = math3d.aabb_merge(aabb, aabb2)
-	assert(math3d.aabb_isvalid(mergeaabb))
-
-	assert(math3d.isequal(math3d.vector(-1.0, 0.0, 0.0), math3d.array_index(mergeaabb, 1)))
-	assert(math3d.isequal(math3d.vector(0.0, 2.0, 3.0), math3d.array_index(mergeaabb, 2)))
-
-
-	aabb = math3d.aabb(math3d.vector(-2.0, -3.0, -5.0), math3d.vector(1.0, 2.0, 3.0))
-	aabb2 = math3d.aabb(math3d.vector(-20.0, 31.0, 5.0), math3d.vector(1.0, 32.0, 36.0))
-
-	mergeaabb = math3d.aabb_merge(aabb, aabb2)
-
-	assert(math3d.isequal(math3d.vector(-20.0, -3.0, -5.0), math3d.array_index(mergeaabb, 1)))
-	assert(math3d.isequal(math3d.vector(1.0, 32.0, 36.0), math3d.array_index(mergeaabb, 2)))
-
-
-	local aabb = math3d.aabb(math3d.vector(-1, 1, -1), math3d.vector(1, 2, 1))
-	local insidept, outsidept, layonpt = math3d.vector(0, 1.5, 0), math3d.vector(-2, 0, 0), math3d.vector(1, 2, 0)
-	local isinside	= assert(math3d.aabb_test_point(aabb, insidept) > 0)
-	local isoutside	= assert(math3d.aabb_test_point(aabb, outsidept) < 0)
-	local islayon	= assert(math3d.aabb_test_point(aabb, layonpt) == 0)
-
-	print "aabb test point, aabb:"
-	print("\tinside point:",	math3d.tostring(insidept), ", result:", isinside)
-	print("\toutside point:",	math3d.tostring(insidept), ", result:", isoutside)
-	print("\tlayon point:",		math3d.tostring(insidept), ", result:", islayon)
-
-	--create an aabb and ortho frustum, and make them overlap each other
-	local aabb = math3d.aabb(math3d.vector(-1, -1, -1), math3d.vector(1, 1, 1))
-	print "\t1. test aabb points:"
-	print_box_points(math3d.aabb_points(aabb), 2)
-
-	local projmat = math3d.projmat{ortho=true, l=-1, r=1, t=1, b=-1, n=0, f=1}
-	print "\t1. test frustum point:"
-	print_box_points(math3d.frustum_points(projmat), 2)
-
-	local intersectpoints = math3d.frustum_aabb_intersect_points(projmat, aabb)
-	print "\t1. intersect results:"
-	print_points(intersectpoints, 2)
-
-	local aabb2 = math3d.aabb(math3d.vector(-2, -2, -2), math3d.vector(2, 2, 2))
-	print "\t2. test aabb points:"
-	local aabbpoints2 = math3d.aabb_points(aabb2)
-	print_box_points(aabbpoints2, 2)
-	local projmat2 = math3d.projmat{l=-1, r=1, t=1, b=-1, n = 1, f=10}
-	print "\t2. test frustum point:"
-	local f2points = math3d.frustum_points(projmat2)
-	print_box_points(f2points, 2)
-
-	intersectpoints = math3d.frustum_aabb_intersect_points(projmat2, aabb2)
-	print "\t2. intersect results:"
-	print_points(intersectpoints, 2)
-end
-
-local r2l_mat = math3d.matrix{s={-1.0, 1.0, 1.0}}
-local r2l_mat1 = math3d.matrix{s={1.0, 1.0, -1.0}}
-local r2l_mat2 = math3d.matrix{s={-1.0, -1.0, -1.0}}
-
-local function print_mat(mat)
-	print "origin matrix:"
-	print(math3d.tostring(mat))
-	local p = math3d.vector(1, 2, 3, 1)
-
-	print "transform point:(1, 2, 3, 1)"
-	print(math3d.tostring(math3d.transform(mat, p, 1)))
-	local s, r, t = math3d.srt(mat)
-
-	print("srt.s:", math3d.tostring(s))
-	print("srt.r:", math3d.tostring(r))
-	print("srt.t:", math3d.tostring(t))
-
-	print "transform srt.s by srt.r"
-	print(math3d.tostring(math3d.transform(r, s, 0)))
-
-	local m = math3d.matrix{s=s, r=r, t=t}
-	print "combine matrix:"
-	print(math3d.tostring(m))
-	print "transform point:(1, 2, 3, 1) by combine matrix"
-	print(math3d.tostring(math3d.transform(m, p, 1)))
-end
-print "test matrix decompose to s, r, t"
-print_mat(r2l_mat)
-print_mat(r2l_mat1)
-print_mat(r2l_mat2)
-
-do
-	print "Inverse Z projection matrix:"
-	local frustum = {
-		l = -1.0, r = 1.0, t = 1.0, b = -1.0,
-		n = 1.0, f = 100
-	}
-	local invz_proj = math3d.projmat(frustum, true)
-	local proj = math3d.projmat(frustum)
-
-	local nearpt = math3d.vector(0.0, 0.0, 1.0, 1.0)
-	local farpt = math3d.vector(0.0, 0.0, 100.0, 1.0)
-
-	local middlept = math3d.vector(0.0, 0.0, (1.0+100)*0.5, 1.0)
-	local quadpt = math3d.vector(0.0, 0.0, (1.0+100)*0.25, 1.0)
-	local pp0 = math3d.transform(invz_proj, nearpt, 1)
-	local pp1 = math3d.transform(invz_proj, farpt, 1)
-	local pp2 = math3d.transform(invz_proj, middlept, 1)
-	local pp3 = math3d.transform(invz_proj, quadpt, 1)
-	print "invz projection point:"
-	print(math3d.tostring(pp0))
-	print(math3d.tostring(pp1))
-	print(math3d.tostring(pp2))
-	print(math3d.tostring(pp3))
-
-	print "projection point:"
-	pp0 = math3d.transform(proj, nearpt, 	1)
-	pp1 = math3d.transform(proj, farpt, 	1)
-	pp2 = math3d.transform(proj, middlept, 	1)
-	pp3 = math3d.transform(proj, quadpt, 1)
-
-	print(math3d.tostring(pp0))
-	print(math3d.tostring(pp1))
-	print(math3d.tostring(pp2))
-	print(math3d.tostring(pp3))
-end
-
-print "==== array ====="
-do
-	local array = math3d.array_vector {
-		{ 1,2,3,4 },
-		math3d.vector ( 42, 0 , 0 ),
-	}
-	print(math3d.tostring(array))
-	local arrays = math3d.serialize(array)
-	array = math3d.array_vector(arrays)
-	assert(math3d.array_size(array) == 2)
-	print(math3d.tostring(math3d.array_index(array, 1)))
-
-	local mat_array = math3d.array_matrix {
-		{ t = { 1,2,3,4 } },
-		{ s = 2 },
-	}
-
-	print(math3d.tostring(mat_array))
-
-	local r = math3d.mul_array( math3d.matrix { t = { 4,3,2,1 } } ,mat_array)
-
-	local tmp = math3d.array_matrix {
-		{ s = 1},
-		{ s = 2},
-	}
-	local output_ref = math3d.array_matrix_ref(math3d.value_ptr(tmp), 2)
-	print("ARRAY", math3d.tostring(output_ref))
-	print("ARRAY[1]", math3d.tostring(math3d.array_index(output_ref,1)))
-	print("ARRAY[2]", math3d.tostring(math3d.array_index(output_ref,2)))
---	math3d.assign(outout_ref, math3d.constant "matrix")
---	print(math3d.tostring(tmp), math3d.tostring(output_ref))
-
-	math3d.mul_array( math3d.matrix { s = 42 }, mat_array, output_ref)
-
-	print(math3d.tostring(tmp))
-
-	math3d.mul_array( mat_array, mat_array, output_ref)
-
-	for i = 1, 2 do
-		local m = math3d.array_index(mat_array, i)
-		assert(math3d.tostring(math3d.mul(m, m)) == math3d.tostring(math3d.array_index(tmp, i)))
-	end
-end
-
--- test live
-
-do
-
-	print "===ALIVE==="
-	local v = math3d.vector(1,2,3,4)
-
-	math3d.reset()
-
-	print(math3d.tostring(v))
-
-	v = math3d.live(v)
-
-	math3d.reset()
-
-	print(math3d.tostring(v))
-
-	v = math3d.mark(v)
-
-	math3d.reset()
-
-	print(math3d.tostring(v))
-
-	math3d.reset()
-
-	math3d.unmark(v)
-
-	print(math3d.tostring(v))
-end
-
-print "===ADAPTER==="
-local adapter = require "math3d.adapter" (math3d._COBJECT)
-local succ, testfunc = pcall(require, "math3d.adapter.test")
-
-if succ then
-	local vector 	= adapter.vector(testfunc.vector, 1)	-- convert arguments to vector pointer from 1
-	local matrix1 	= adapter.matrix(testfunc.matrix1, 1, 1)	-- convert 1 mat
-	local matrix2 	= adapter.matrix(testfunc.matrix2, 1, 2)	-- convert 2 mat
-	local matrix 	= adapter.matrix(testfunc.matrix2, 1)	-- convert all mat
-	local var 		= adapter.variant(testfunc.vector, testfunc.matrix1, 1)
-	local format 	= adapter.format(testfunc.variant, testfunc.format, 2)
-	local mvq 		= adapter.getter(testfunc.getmvq, "mvq")	-- getmvq will return matrix, vector, quat
-	local matrix2_v = adapter.format(testfunc.matrix2, "mm", 1)
-	local retvec 	= adapter.output_vector(testfunc.retvec, 1)
-
-	print(vector(ref2, math3d.vector{1,2,3}))
-	print(matrix1(ref1))
-	print(matrix2(ref1,ref1))
-	print(matrix2_v(ref1,ref1))
-	print(matrix(ref1,ref1))
-	print(var(ref1))
-	print(var(ref2))
-	print(format("mv", ref1, ref2))
-	local m,v, q = mvq()
-	print(math3d.tostring(m), math3d.tostring(v), math3d.tostring(q))
-
-	local v1,v2 =retvec()
-	print(math3d.tostring(v1), math3d.tostring(v2))
-end
-
-print "===PROJECTIVE MATRIX WITH INFINITE FAR PLANE TEST==="
-do
-	local function compare_camera(inv_z, n, f, ortho)
-		local p, infp
-		if ortho then
-			p = math3d.projmat({l=-1,r=1,t=-1,b=1,n=n,f=f,ortho=true}, inv_z)
-			infp = math3d.projmat({l=-1,r=1,t=-1,b=1,n=n,f=f,ortho=true}, true)
-		else
-			p = math3d.projmat({n=n, f=f, fov=60, aspect=4/3}, inv_z)
-			infp = math3d.projmat({n=n, f=f, fov=60, aspect=4/3}, inv_z, true)
-		end
-		local updir = math3d.vector(0, 1, 0)
-		local eyepos = math3d.vector(0, 0, 0)
-		local direction = math3d.normalize(math3d.vector(0, 0, 1))
-		local v = math3d.lookto(eyepos, direction, updir)
-		local vp = math3d.mul(p, v)
-		local vinfp = math3d.mul(infp, v)
-
-		local zz_n, ww_n = math3d.index(math3d.transform(vp, math3d.vector(0, 0, n), 1), 3, 4)
-		local zzinf_n, wwinf_n = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, n), 1), 3, 4)
-
-		local zz_m, ww_m = math3d.index(math3d.transform(vp, math3d.vector(0, 0, (n+f)*0.5), 1), 3, 4)
-		local zzinf_m, wwinf_m = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, (n+f)*0.5), 1), 3, 4)
-
-		local zz_f, ww_f = math3d.index(math3d.transform(vp, math3d.vector(0, 0, f), 1), 3, 4)
-		local zzinf_f, wwinf_f = math3d.index(math3d.transform(vinfp, math3d.vector(0, 0, f), 1), 3, 4)
-
-		local ndf_n, ndf_n_inf = zz_n / ww_n, zzinf_n / wwinf_n
-		local ndf_m, ndf_m_inf = zz_m / ww_m, zzinf_m / wwinf_m
-		local ndf_f, ndf_f_inf = zz_f / ww_f, zzinf_f / wwinf_f
-		return ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf
-	end
-
-	local ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.1, 10000)
-	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf= compare_camera(true, 0.1, 20000)
-	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.01, 1000)
-	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(true, 0.01, 2000)
-	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.1, 10000, true)
-	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf= compare_camera(true, 0.1, 20000, true)
-	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(false, 0.01, 1000, true)
-	ndf_n, ndf_n_inf, ndf_m, ndf_m_inf, ndf_f, ndf_f_inf = compare_camera(true, 0.01, 2000, true)
-end
-
-print "===INFO TEST==="
-
-print("SLOT = ", math3d.info "slot")
-print("REF = ", math3d.info "ref")
 ref1 = nil
 ref2 = nil
 ref3 = nil
-collectgarbage "collect"
-print("REF = ", math3d.info "ref")
-print("N = ", math3d.info "transient")
-local m = math3d.marked_matrix { s = 1 , t = { 0,0,0 } }
-print(math3d.tostring(m))
-math3d.unmark(m)
-print("N = ", math3d.info "transient")
-
-do
-	math3d.reset()
-	print("LAST = ", math3d.info "last")
-	for i = 1, 4096 do
-		math3d.matrix {}
-		math3d.vector { 0,0,0}
-	end
-	math3d.reset()
-	print("LAST = ", math3d.info "last")
-
-	print(math3d.tostring(math3d.vector(0,0,0)))
-end
-
-print("SLOT = ", math3d.info "slot")
