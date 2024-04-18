@@ -794,7 +794,7 @@ quat_from_index(lua_State *L, struct math_context *M, int index) {
 }
 
 static inline math_t
-frustum_planes_from_index(lua_State *L, struct math_context *M, int index){
+box_planes_from_index(lua_State *L, struct math_context *M, int index){
 	math_t planes = object_from_index(L, M, index, MATH_TYPE_VEC4, vector_from_table);
 	if (math_isnull(planes) || math_size(M, planes) != 6)
 		luaL_error(L, "Invalid Frustum Planes");
@@ -802,7 +802,7 @@ frustum_planes_from_index(lua_State *L, struct math_context *M, int index){
 }
 
 static inline math_t
-frustum_points_from_index(lua_State *L, struct math_context *M, int index){
+box_points_from_index(lua_State *L, struct math_context *M, int index){
 	math_t points = object_from_index(L, M, index, MATH_TYPE_VEC4, vector_from_table);
 	if (math_isnull(points) || math_size(M, points) != 8)
 		luaL_error(L, "Invalid Frustum Planes");
@@ -2072,7 +2072,7 @@ lfrustum_planes(lua_State *L) {
 static int
 lfrustum_intersect_aabb(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	const math_t planes = frustum_planes_from_index(L, M, 1);
+	const math_t planes = box_planes_from_index(L, M, 1);
 	const math_t aabb = aabb_from_index(L, M, 2);
 	lua_pushinteger(L, math3d_frustum_intersect_aabb(M, planes, aabb));
 	return 1;
@@ -2081,7 +2081,7 @@ lfrustum_intersect_aabb(lua_State *L) {
 static int
 lfrustum_intersect_aabb_list(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	math_t planes = frustum_planes_from_index(L, M, 1);
+	math_t planes = box_planes_from_index(L, M, 1);
 
 	luaL_checktype(L, 2, LUA_TTABLE);
 	const int numelem = (int)lua_rawlen(L, 2);
@@ -2329,8 +2329,8 @@ lmul_array(lua_State *L) {
 static int
 lpoints_center(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	const math_t points = frustum_points_from_index(L, M, 1);
-	const math_t center = math3d_frustum_center(M, points);
+	const math_t points = box_points_from_index(L, M, 1);
+	const math_t center = math3d_box_center(M, points);
 	lua_pushmath(L, center);
 
 	return 1;
@@ -2339,7 +2339,7 @@ lpoints_center(lua_State *L) {
 static int
 lpoints_radius(lua_State *L) {
 	struct math_context *M = GETMC(L);
-	const math_t points = frustum_points_from_index(L, M, 1);
+	const math_t points = box_points_from_index(L, M, 1);
 	const math_t center = vector_from_index(L, M, 2);
 	lua_pushnumber(L, math3d_frustum_max_radius(M, points, center));
 	return 1;
@@ -2348,7 +2348,7 @@ lpoints_radius(lua_State *L) {
 static int
 lpoints_aabb(lua_State *L){
 	struct math_context *M = GETMC(L);
-	const math_t points = frustum_points_from_index(L, M, 1);
+	const math_t points = box_points_from_index(L, M, 1);
 	lua_pushmath(L, math3d_frusutm_aabb(M, points));
 	return 1;
 }
@@ -2655,7 +2655,6 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 
 		//points
 		{ "points_center",	lpoints_center},
-		{ "points_radius",	lpoints_radius},
 		{ "points_aabb",	lpoints_aabb},
 		
 		//plane

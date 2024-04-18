@@ -76,7 +76,7 @@ math_t math3d_frustum_planes(struct math_context *, math_t m, int homogeneous_de
 int    math3d_frustum_intersect_aabb(struct math_context *, math_t planes, math_t aabb);
 math_t math3d_frustum_points(struct math_context *, math_t m, int homogeneous_depth);	// return vec4[8]
 math_t math3d_frustum_points_with_nearfar(struct math_context *M, math_t m, float n, float f);
-math_t math3d_frustum_center(struct math_context *, math_t points);
+math_t math3d_box_center(struct math_context *, math_t points);
 float  math3d_frustum_max_radius(struct math_context *, math_t points, math_t center);
 
 math_t math3d_frusutm_aabb(struct math_context *, math_t points);

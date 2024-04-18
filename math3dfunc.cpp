@@ -1069,7 +1069,7 @@ math3d_dir2radian(struct math_context *M, math_t rad, float radians[2]) {
 }
 
 math_t
-math3d_frustum_center(struct math_context *M, math_t points) {
+math3d_box_center(struct math_context *M, math_t points) {
 	math_t id;
 	glm::vec4 &c = allocvec4(M, &id);
 	c = glm::vec4(0, 0, 0, 1);
@@ -1082,19 +1082,6 @@ math3d_frustum_center(struct math_context *M, math_t points) {
 	c.w = 1.f;
 
 	return id;
-}
-
-float
-math3d_frustum_max_radius(struct math_context *M, math_t points, math_t center) {
-	float maxradius = 0;
-	const glm::vec4 &c = VEC(M, center);
-	int ii;
-	for (ii = 0; ii < 8; ++ii) {
-		const glm::vec4 &p = VEC(M, math_index(M, points, ii));
-		maxradius = glm::max(glm::length(p - c), maxradius);
-	}
-
-	return maxradius;
 }
 
 math_t
@@ -1416,27 +1403,25 @@ math3d_frustum_planes(struct math_context *M, math_t m, int homogeneous_depth) {
 
 int
 math3d_frustum_intersect_aabb(struct math_context *M, math_t planes, math_t aabb) {
-	int ii;
-	int r = 1;
 	check_type(M, aabb, MATH_TYPE_VEC4);
 
 	auto a = AABB(M, aabb);
 
 	const float * planes_v = math_value(M, planes);
-
-	for (ii = 0; ii < 6; ++ii){
+	int where = 1;
+	for (int ii = 0; ii < 6; ++ii){
 		const auto &p = VECPTR(planes_v + ii * 4);
-		int t = plane_intersect(p, a.minv, a.maxv);
-		r = t < r ? t : r;
-		// r = -1, aabb outside one plane, means outside frustum
-		if (r < 0){
-			return r;
-		}
+		const int w = plane_intersect(p, a.minv, a.maxv);
+		if (w < 0)
+			return -1;
+
+		if (w == 0)
+			where = 0;
 	}
 
-	// r = 1, aabb in front of all planes, mean inside frustum
-	// r = 0, aabb in front of part planes or aabb intersect with part planes, mean intersect frustum
-	return r;
+	// where = 1, aabb inside frustum
+	// where = 0, aabb intersect with one of frustum planes
+	return where;
 }
 
 struct frustum_corners {
