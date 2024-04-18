@@ -935,9 +935,13 @@ math3d_minmax(struct math_context *M, math_t transform, math_t points) {
 		}
 	} else {
 		const glm::mat4& m = MAT(M, transform);
-		minmax[0] = minmax[1] = m * VEC(M, p);
+		const glm::vec4& v = VEC(M, p);
+		assert(v.w == 1.f || v.w == 0.f);
+		minmax[0] = minmax[1] = m * v;
 		for (int ii=1; ii<(int)numpoints; ++ii){
-			const glm::vec4 tpp = m * VEC(M, math_index(M, points, ii));
+			const glm::vec4 &vv = VEC(M, math_index(M, points, ii));
+			assert(vv.w == 1.f || vv.w == 0.f);
+			const glm::vec4 tpp = m * vv;
 			minmax[0] = glm::min(minmax[0], tpp);
 			minmax[1] = glm::max(minmax[1], tpp);
 		}
