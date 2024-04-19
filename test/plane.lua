@@ -52,3 +52,49 @@ do
 	local _ = math3d.point2plane(testpt2, p1) ==-1 or error(("Invalid point2plane, test point:%s, plane:%s, result should be:%d, but return:%d"):format(math3d.tostring(testpt2), math3d.tostring(p1),-1, math3d.point2plane(testpt1, p1)))
 	local _ = math3d.point2plane(testpt3, p1) == 0 or error(("Invalid point2plane, test point:%s, plane:%s, result should be:%d, but return:%d"):format(math3d.tostring(testpt3), math3d.tostring(p1), 0, math3d.point2plane(testpt1, p1)))
 end
+
+
+print "===AABB PLANE==="
+local PLANE<const> = tu.plane_indiecs
+local ONE_TAB<const>, TWO_TAB<const> = tu.ONE_TAB, tu.TWO_TAB
+do
+	print "\tcheck aabb planes"
+	local aabb = math3d.aabb(math3d.vector(-1, -1, -1, 0), math3d.vector(1, 1, 1, 0))
+	tu.print_aabb(aabb, ONE_TAB)
+	local check_planes = {
+		[PLANE.left] 	= math3d.plane(math3d.vector( 1, 0, 0),-1),
+		[PLANE.right]	= math3d.plane(math3d.vector(-1, 0, 0),-1),
+		[PLANE.bottom]	= math3d.plane(math3d.vector( 0, 1, 0),-1),
+		[PLANE.top]		= math3d.plane(math3d.vector( 0,-1, 0),-1),
+		[PLANE.near]	= math3d.plane(math3d.vector( 0, 0, 1),-1),
+		[PLANE.far]		= math3d.plane(math3d.vector( 0, 0,-1),-1),
+	}
+
+	local aabb_planes = math3d.aabb_planes(aabb)
+	print "\taabb planes:"
+	tu.print_box_planes(aabb_planes)
+	assert(math3d.array_size(aabb_planes) == #check_planes)
+	for i=1, #check_planes do
+		local p1 = check_planes[i]
+		local p2 = math3d.array_index(aabb_planes, i)
+		local d1 = math3d.index(p1, 4)
+		local d2 = math3d.index(p2, 4)
+		assert(math3d.isequal(p1, p2))
+		assert(math.abs(d1 - d2) < 1e-6)
+	end
+
+	print "\ttest aabb planes by point:"
+	local pt = math3d.vector(1, 1, 1)
+	tu.print_with_tab("test point:" .. math3d.tostring(pt), ONE_TAB)
+	local aabb2 = math3d.aabb(math3d.vector(0.5, 0.5, 0.5, 0), math3d.vector(1.5, 1.5, 1.5, 0))
+	print "\ttest aabb:"
+	tu.print_aabb(aabb, ONE_TAB)
+	local aabb_planes2 = math3d.aabb_planes(aabb2)
+	for i=1, math3d.array_size(aabb_planes2) do
+		local p = math3d.array_index(aabb_planes2, 1)
+		tu.print_with_tab("plane:" .. math3d.tostring(p))
+		local r = math3d.plane_test_point(p, pt)
+		tu.print_with_tab("test result:" .. r, TWO_TAB)
+		local _ = r == 1 or error(("pt:%s, must on top of this plane:%s"):format(math3d.tostring(pt), math3d.tostring(p)))
+	end
+end

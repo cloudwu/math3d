@@ -54,7 +54,7 @@ do
 	local function do_ray_box_test(ray, boxpoints)
 		print "\tray:"
 		tu.print_ray(ray, 2)
-		local resultpoints = math3d.ray_intersect_box(ray.o, ray.d, boxpoints)
+		local resultpoints = math3d.box_ray(ray.o, ray.d, boxpoints)
 		print "\tray intersect results:"
 		tu.print_points(resultpoints, 2)
 		return resultpoints
