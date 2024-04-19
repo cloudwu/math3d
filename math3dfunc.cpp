@@ -1661,7 +1661,7 @@ ray_interset_box(struct math_context * M, const glm::vec4 &o, const glm::vec4& d
 }
 
 math_t
-math3d_ray_intersect_box(struct math_context * M, math_t o, math_t d, math_t boxpoints){
+math3d_box_ray(struct math_context * M, math_t o, math_t d, math_t boxpoints){
 	glm::vec4 points[MAX_INTERSECT_POINTS];
 
 	const uint8_t n = ray_interset_box(M, VEC(M, o), VEC(M, d), boxpoints, points);
