@@ -107,7 +107,7 @@ function util.print_box_planes(planes, tabnum)
 	assert(math3d.array_size(planes) == 6)
 
 	local function plane_name(pidx, tabnum)
-		return util.tabs(tabnum) .. math3d.tostring(math3d.array_index(planes, pidx))
+		return ("%s%s:%s"):format(util.tabs(tabnum), util.plane_names[pidx], math3d.tostring(math3d.array_index(planes, pidx)))
 	end
 	local t = {}
 	for i=1, 6 do

@@ -1394,11 +1394,6 @@ math3d_aabb_planes(struct math_context *M, math_t aabb){
 	const glm::vec4* minv = (const glm::vec4*)math_value(M, aabb);
 	const glm::vec4* maxv = minv + 1;
 
-	auto create_plane = [](const glm::vec3& n, const glm::vec3& p) {
-		const float d = glm::dot(n, p);
-		return glm::vec4(n, d);
-	};
-
 	pp[PN_left]		= create_plane(glm::vec3( 1.f, 0.f, 0.f), V3R(*minv));
 	pp[PN_bottom]	= create_plane(glm::vec3( 0.f, 1.f, 0.f), V3R(*minv));
 	pp[PN_near]		= create_plane(glm::vec3( 0.f, 0.f, 1.f), V3R(*minv));
