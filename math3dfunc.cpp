@@ -917,6 +917,14 @@ maxv(struct math_context *M, math_t v0, math_t v1) {
 	return math_vec4(M, tmp);
 }
 
+static inline glm::vec4
+transform_pt(struct math_context *M, const glm::mat4& m, math_t p){
+	glm::vec4 v = VEC(M, p);
+	v.w = 1.f;//we assue p must be a point
+	v = m * v;
+	return v / v.w;
+}
+
 math_t
 math3d_minmax(struct math_context *M, math_t transform, math_t points) {
 	const size_t numpoints	= math_size(M, points);
@@ -935,13 +943,9 @@ math3d_minmax(struct math_context *M, math_t transform, math_t points) {
 		}
 	} else {
 		const glm::mat4& m = MAT(M, transform);
-		const glm::vec4& v = VEC(M, p);
-		assert(v.w == 1.f || v.w == 0.f);
-		minmax[0] = minmax[1] = m * v;
+		minmax[0] = minmax[1] = transform_pt(M, m, p);
 		for (int ii=1; ii<(int)numpoints; ++ii){
-			const glm::vec4 &vv = VEC(M, math_index(M, points, ii));
-			assert(vv.w == 1.f || vv.w == 0.f);
-			const glm::vec4 tpp = m * vv;
+			const glm::vec4 tpp = transform_pt(M, m, math_index(M, points, ii));
 			minmax[0] = glm::min(minmax[0], tpp);
 			minmax[1] = glm::max(minmax[1], tpp);
 		}
