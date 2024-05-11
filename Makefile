@@ -1,5 +1,5 @@
 LUAINC=-I /usr/local/include
-LUALIB=-L /usr/local/bin -llua54
+LUALIB=-L /usr/local/bin -L$(MINGW)/bin -llua54
 GLM_INC = -I glm
 ODIR = o
 CFLAGS = -O2 -Wall
