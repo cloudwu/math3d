@@ -1,7 +1,7 @@
 local math3d = require "math3d"
 local tu = require "test.util"
 
-print "===RAY/LINE INTERSET WITH TRIANGLES==="
+print "===RAY/LINE INTERSET WITH TRIANGLE==="
 do
 	local v0, v1, v2 = math3d.vector(-1.0, 0.0, 0.0, 1.0), math3d.vector(0.0, 1.0, 0.0, 1.0), math3d.vector(1.0, 0.0, 0.0, 1.0)
 	print "\ttriangle1:"
@@ -94,4 +94,41 @@ do
 	local ray6 = tu.create_ray(math3d.vector(1.0, 1.0, -1.0, 1.0), math3d.vector(2.0, 2.0, 2.0, 1.0))
 	results = do_ray_box_test(ray6, aabbpoints2)
 	assert(math3d.array_size(results) == 2)
+end
+
+print "===RAY INTERSET WITH MULTI TRIANGLES==="
+do
+    local function posstr(x, y, z)
+        return ('fff'):pack(x, y, z)
+    end
+	local function add_tri(t, v0, v1, v2)
+		t[#t+1] = v0
+		t[#t+1] = v1
+		t[#t+1] = v2
+	end
+
+	local function tri2buffer(t)
+		return table.concat(t, "")
+	end
+
+	local triangles = {}
+	add_tri(triangles, posstr(0, 0, 0), posstr(0, 1, 0), posstr(1, 0, 0))
+
+	local tb = tri2buffer(triangles)
+	local r1 = tu.create_ray(math3d.vector(0, 0, -3), math3d.vector(0, 0, 1))
+	tu.print_ray(r1)
+
+	print "\ttriangles:"
+	tu.print_triangle2(triangles[1], triangles[2], triangles[3], 2)
+	local t, pt = math3d.triangles_ray(r1.o, r1.d, tb, #triangles // 3, true)
+	assert(t and math3d.isequal(pt, math3d.vector(0.0, 0.0, 0.0)))
+
+	add_tri(triangles, posstr(0, 0, -1), posstr(0, 1, -1), posstr(1, 0, -1))
+	print "\ttriangles:"
+	tu.print_triangle2(triangles[4], triangles[5], triangles[6], 2)
+
+	local tb1 = tri2buffer(triangles)
+	local t1, pt1 = math3d.triangles_ray(r1.o, r1.d, tb1, #triangles // 3, true)
+
+	assert(t1 ~= nil and math3d.isequal(pt1, math3d.vector(0, 0, -1)))
 end

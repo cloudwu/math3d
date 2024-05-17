@@ -2187,6 +2187,52 @@ ltriangle_ray(lua_State *L){
 	return 1;
 }
 
+static inline const struct triangle*
+to_triangles(lua_State *L, int idx){
+	const int ltype = lua_type(L, 3);
+	switch(ltype){
+		case LUA_TSTRING:{
+			size_t len = 0;
+			const struct triangle* triangles = (const struct triangle*)lua_tolstring(L, 3, &len);
+			if (len == 0){
+				luaL_error(L, "Invalid triangles buffer");
+			}
+			return triangles;
+		}
+		case LUA_TLIGHTUSERDATA:{
+			return (const struct triangle*)lua_touserdata(L, 3);
+		}
+		default:
+			luaL_error(L, "Invalid argument type");
+			return NULL;
+	}
+}
+
+static int
+ltriangles_ray(lua_State *L){
+	struct math_context *M = GETMC(L);
+	const math_t o = vector_from_index(L, M, 1);
+	const math_t d = vector_from_index(L, M, 2);
+
+	const struct triangle* triangles 	= to_triangles(L, 3);
+	const uint32_t numtri 				= (uint32_t)luaL_checkinteger(L, 4);
+	if (numtri == 0){
+		luaL_error(L, "At least one triangle");
+	}
+
+	const int withpt = lua_isnoneornil(L, 5) ? 0 : lua_toboolean(L, 5);
+	struct ray_triangle_interset_result r;
+	if (math3d_ray_triangles(M, o, d, triangles, numtri, &r)){
+		lua_pushnumber(L, r.t);
+		if (withpt){
+			lua_pushmath(L, math3d_ray_point(M, o, d, r.t));
+			return 2;
+		}
+		return 1;
+	}
+	return 0;
+}
+
 static int
 lbox_ray(lua_State *L){
 	struct math_context *M = GETMC(L);
@@ -2358,7 +2404,7 @@ lplane(lua_State *L){
 		math_t pt = vector_from_index(L, M, 2);
 		lua_pushmath(L, math3d_plane_from_normal_point(M, n, pt));
 	} else if (ltype == LUA_TNUMBER){
-		lua_pushmath(L, math3d_plane(M, n, lua_tonumber(L, 2)));
+		lua_pushmath(L, math3d_plane(M, n, (float)lua_tonumber(L, 2)));
 	} else {
 		luaL_error(L, "Invalid argument for create plane");
 	}
@@ -2398,14 +2444,7 @@ lplane_ray(lua_State *L) {
 	lua_pushnumber(L, t);
 
 	if (withpt){
-		float r[4];
-		const float* rdv = math_value(M, rd);
-		const float* rov = math_value(M, ro);
-		for(int ii=0; ii<3; ++ii){
-			r[ii] = rov[ii] + rdv[ii] * t;
-		}
-		r[3] = 1.f;
-		lua_pushmath(L, math_import(M, r, MATH_TYPE_VEC4, 1));
+		lua_pushmath(L, math3d_ray_point(M, ro, rd, t));
 		return 2;
 	}
 	return 1;
@@ -2692,6 +2731,7 @@ init_math3d_api(lua_State *L, struct math3d_api *M) {
 		//ray
 		{ "plane_ray",			lplane_ray},
 		{ "triangle_ray",		ltriangle_ray},
+		{ "triangles_ray",		ltriangles_ray},
 		{ "box_ray", 			lbox_ray},
 
 		{ "marked_vector", lmarked_vector },

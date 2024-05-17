@@ -85,6 +85,15 @@ math_t math3d_frstum_aabb_intersect_points(struct math_context *M, math_t m, mat
 
 math_t math3d_box_ray(struct math_context * M, math_t o, math_t d, math_t boxpoints);
 
+math_t math3d_ray_point(struct math_context * M, math_t o, math_t d, float t);
+
+struct tri_pos {float v[3];};
+struct triangle{
+	struct tri_pos p[3];
+};
+
+int math3d_ray_triangles(struct math_context *M, math_t o, math_t d, const struct triangle* triangles, uint32_t numtriangles, struct ray_triangle_interset_result *r);
+
 struct ray_triangle_interset_result { float t; float u, v; };
 int math3d_ray_triangle_interset(struct math_context *M, math_t s0, math_t s1, math_t v0, math_t v1, math_t v2, struct ray_triangle_interset_result *r);
 
