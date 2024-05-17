@@ -1601,6 +1601,41 @@ math3d_ray_triangle_interset(struct math_context *M, math_t o, math_t d, math_t 
 	return intersect_triangle3(VEC3(M, o), VEC3(M, d), VEC3(M, v0), VEC3(M, v1), VEC3(M, v2), *r);
 }
 
+math_t
+math3d_ray_point(struct math_context * M, math_t o, math_t d, float t){
+	glm::vec4 p = VEC(M, o) + VEC(M, d) * t;
+	p.w = 1.f;
+	return math_import(M, &p.x, MATH_TYPE_VEC4, 1);
+}
+
+static_assert(sizeof(struct triangle) == 36, "Invalid triangle size");
+
+int
+math3d_ray_triangles(struct math_context *M, math_t o, math_t d, const struct triangle* triangles, uint32_t numtriangles, struct ray_triangle_interset_result *r){
+	const glm::vec4& ro = VEC(M, o);
+	const glm::vec4& rd = VEC(M, d);
+
+	struct ray_triangle_interset_result rr;
+	rr.t = FLT_MAX;
+	bool found = false;
+	for (uint32_t ii=0; ii<numtriangles; ++ii){
+		const struct triangle& tri = triangles[ii];
+		struct ray_triangle_interset_result rrr;
+		if (intersect_triangle3(ro, rd, *(glm::vec3*)(tri.p), *(glm::vec3*)(tri.p+1), *(glm::vec3*)(tri.p+2), rrr) && rrr.t >= 0.f){
+			if (rrr.t < rr.t){
+				rr = rrr;
+				found = true;
+			}
+		}
+	}
+
+	if (found){
+		*r = rr;
+		return 1;
+	}
+	return 0;
+}
+
 // face normal point to box center
 static constexpr uint8_t FACE_INDICES[PN_count * 4] = {
 	BP_lbn, BP_ltn, BP_lbf, BP_ltf, //left

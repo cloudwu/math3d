@@ -46,6 +46,19 @@ function util.check_aabb(aabb, minv, maxv)
 	assert(math3d.isequal(maxv, math3d.array_index(aabb, 2)))
 end
 
+function util.print_vertex(v, tabnum)
+	local x, y, z = ('fff'):unpack(v)
+	util.print_with_tab(("x: %f, y: %f, z: %f"):format(x, y, z), tabnum)
+end
+
+function util.print_triangle2(v0, v1, v2, tabnum)
+	tabnum = tabnum or 0
+	util.print_with_tab("triangle:", tabnum)
+	util.print_vertex(v0, tabnum+1)
+	util.print_vertex(v1, tabnum+1)
+	util.print_vertex(v2, tabnum+1)
+end
+
 local corner_names = {
 	"lbn", "ltn", "rbn", "rtn",
 	"lbf", "ltf", "rbf", "rtf",
