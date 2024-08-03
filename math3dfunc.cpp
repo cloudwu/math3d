@@ -1621,7 +1621,10 @@ math3d_ray_triangles(struct math_context *M, math_t o, math_t d, const struct tr
 	for (uint32_t ii=0; ii<numtriangles; ++ii){
 		const struct triangle& tri = triangles[ii];
 		struct ray_triangle_interset_result rrr;
-		if (intersect_triangle3(ro, rd, *(glm::vec3*)(tri.p), *(glm::vec3*)(tri.p+1), *(glm::vec3*)(tri.p+2), rrr) && rrr.t >= 0.f){
+		const glm::vec3 * tri0 = (const glm::vec3 *)tri.p[0].v;
+		const glm::vec3 * tri1 = (const glm::vec3 *)tri.p[1].v;
+		const glm::vec3 * tri2 = (const glm::vec3 *)tri.p[2].v;
+		if (intersect_triangle3(ro, rd, *tri0, *tri1, *tri2, rrr) && rrr.t >= 0.f){
 			if (rrr.t < rr.t){
 				rr = rrr;
 				found = true;

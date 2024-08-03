@@ -36,6 +36,8 @@ do
 
 	local vec = math3d.constant { type = "v4", 1,2,3,4 }
 	print(vec, math3d.tostring(vec))
+	local x, y, z, w = math3d.index(vec, 1, 2, 3, 4)
+	assert(x == 1 and y == 2 and z == 3 and w == 4)
 
 	local vec2 = math3d.constant { type = "v4", 1,2,3,4 }
 	print(vec2, math3d.tostring(vec))
