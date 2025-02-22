@@ -44,13 +44,8 @@ local transformed = math3d.transform(mat, pos)
 
 ## Memory Usage
 
-The library uses reference counting and a mark/unmark system. Most functions return temporary values that are valid until the next frame. For persistent values, use `math3d.mark()`:
+The library uses reference counting and a mark/unmark. Most functions return temporary values that are valid until the next frame. For persistent values, use `math3d.mark()`
 
-```lua
-local temp = math3d.vector(1,2,3)      -- Temporary
-local kept = math3d.mark(temp)         -- Will persist
-math3d.unmark(kept)                    -- Manual cleanup if needed
-```
 
 ## Notes
 
