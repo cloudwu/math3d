@@ -4,7 +4,7 @@ A fast C/Lua library for linear algebra topics.
 ## Installation
 
 ```bash
-git clone [repository-url]
+git clone https://github.com/cloudwu/math3d.git
 make
 ```
 
@@ -30,6 +30,3 @@ local transformed = math3d.transform(mat, vec)
 - Ray casting and intersection testing
 - Frustum culling and AABB calculations
 - Memory management with reference counting
-
-## License
-[License info needed]
