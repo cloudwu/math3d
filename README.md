@@ -1,6 +1,6 @@
 # Math3D
 
-A fast C/Lua math library for 3D graphics. Handles vectors, matrices, quaternions and basic geometry.
+A fast C/Lua math library for topics in linear algebra.
 
 ## Installation
 
