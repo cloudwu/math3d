@@ -1,5 +1,6 @@
 debug.getregistry().MATH3D_MAXPAGE = 1024
-
+package.cpath = package.cpath .. ";build/windows/x64/debug/?.dll"
+package.path = package.path .. ";3rd/math3d/?.lua"
 local math3d = require "math3d"
 
 local tu = require "test.util"
@@ -133,6 +134,17 @@ do
 	print(ref3)
 
 	print(math3d.tostring(math3d.constant "quat", math3d.constant "quat"))	-- Identity quat
+
+	--use two vector to create quaternion
+	local v1 = math3d.vector(1.0, 0.0, 0.0, 0.0)
+	local v2 = math3d.vector(1.0, 0.0, 0.0, 0.0)
+	local q1 = math3d.quaternion(v1, v2)
+	assert(math3d.isequal(q1, math3d.quaternion(0.0, 0.0, 0.0, 1.0)))
+
+	--rotate z-axis by 90 degree
+	local v3 = math3d.vector(0.0, 1.0, 0.0, 0.0)
+	local q2 = math3d.quaternion(v1, v3)
+	assert(math3d.isequal(q2, math3d.quaternion{r=math.rad(90), axis=math3d.vector(0.0, 0.0, 1.0)}))
 end
 
 print "===FUNC==="
